@@ -1,98 +1,81 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import Link from "next/link";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { ModeSwitcher } from "@/components/mode-switcher";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Home() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["events"],
-    queryFn: async () => {
-      const response = await apiClient.GET("/api/v1/events");
-      if (response.error) throw new Error("Failed to fetch events");
-      return response.data;
-    },
-  });
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
+          <p className="mt-4 text-muted-foreground">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8 text-zinc-900 dark:text-zinc-50">
-          Events
-        </h1>
-
-        {isLoading && (
-          <div className="text-center py-12">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-            <p className="mt-4 text-zinc-600 dark:text-zinc-400">Loading events...</p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold mb-2">SolPass API Client Demo</h1>
+            <p className="text-muted-foreground">
+              Third-party integration simulation for SolPass ticketing system
+            </p>
           </div>
-        )}
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-800 dark:text-red-200">
-            <p className="font-semibold">Error loading events</p>
-            <p className="text-sm mt-1">{error.message}</p>
-          </div>
-        )}
+          {!isAuthenticated ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Authentication failed. Please check the API server.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <ModeSwitcher />
 
-        {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.isArray(data) && data.length > 0 ? (
-              data.map((event: any) => (
-                <div
-                  key={event.id}
-                  className="bg-white dark:bg-zinc-900 rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-zinc-200 dark:border-zinc-800"
-                >
-                  <h2 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-50">
-                    {event.name}
-                  </h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                    {event.description}
-                  </p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 dark:text-zinc-500">📍</span>
-                      <span className="text-zinc-700 dark:text-zinc-300">{event.venue}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 dark:text-zinc-500">📅</span>
-                      <span className="text-zinc-700 dark:text-zinc-300">
-                        {new Date(event.eventDate).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 dark:text-zinc-500">🎫</span>
-                      <span className="text-zinc-700 dark:text-zinc-300">
-                        {event.totalTickets} tickets
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 dark:text-zinc-500">💰</span>
-                      <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
-                        ${(event.ticketPrice / 100).toFixed(2)}
-                      </span>
-                    </div>
-                    {event.blockchainEnabled && (
-                      <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs rounded-full">
-                        <span>⛓️</span>
-                        <span>Blockchain Enabled</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12 text-zinc-600 dark:text-zinc-400">
-                <p className="text-lg">No events found</p>
+              <div className="grid md:grid-cols-2 gap-6 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Events Management</CardTitle>
+                    <CardDescription>
+                      View all events, create new events, and manage tickets
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Link href="/events">
+                      <Button className="w-full">Go to Events</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>How it Works</CardTitle>
+                    <CardDescription>
+                      This demo simulates a third-party ticket marketplace
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="text-sm space-y-2 text-muted-foreground">
+                      <li>• <strong>Shop Admin:</strong> Create & manage events</li>
+                      <li>• <strong>User 1:</strong> Buy and resell tickets</li>
+                      <li>• <strong>User 2:</strong> Buy resold tickets</li>
+                    </ul>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
