@@ -1,12 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { apiClient } from "@/lib/api-client";
 import type { LoginInput, RegisterInput } from "@/lib/validations/auth-schema";
 import { toast } from "sonner";
 
 interface User {
-  id: string;
+  id?: string;
+  userId?: string;
   email: string;
   walletAddress: string;
   role: string;
@@ -34,39 +35,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore token and fetch profile on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem("auth_token");
-    if (storedToken) {
-      setToken(storedToken);
-      // Fetch profile to verify token is still valid
-      fetchProfileInternal(storedToken);
-    } else {
-      setIsLoading(false);
-    }
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setApiKey(null);
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    toast.success("Logged out successfully");
   }, []);
 
-  const fetchProfileInternal = async (authToken: string) => {
+  const fetchProfileInternal = useCallback(async () => {
     try {
-      const response = await apiClient.GET("/api/v1/auth/me", {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      console.log("Fetching profile from API...");
+      // The auth token is automatically added by middleware in api-client.ts
+      const response = await apiClient.GET("/api/v1/auth/me");
+
+      console.log("API Response:", response);
 
       if (response.data) {
-        setUser(response.data as User);
-      } else {
+        // Handle the API response structure: {data: {success: true, user: {...}}}
+        const responseData = response.data as any;
+        const userData = responseData.user || responseData.data || responseData;
+        console.log("Profile fetched successfully:", userData);
+        setUser(userData);
+        // Persist user data to localStorage
+        localStorage.setItem("auth_user", JSON.stringify(userData));
+      } else if (response.error) {
         // Token invalid, clear it
+        console.error("Profile fetch error:", response.error);
         logout();
       }
     } catch (error) {
       console.error("Failed to fetch profile:", error);
       logout();
-    } finally {
+    }
+  }, [logout]);
+
+  // Restore token and fetch profile on mount
+  useEffect(() => {
+    console.log("Auth initialization running...");
+    const storedToken = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
+    
+    if (storedToken) {
+      console.log("Found stored token, restoring session...");
+      setToken(storedToken);
+      
+      // Restore user from localStorage immediately
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          console.log("Restored user from localStorage:", parsedUser.email);
+          setUser(parsedUser);
+          setIsLoading(false); // Set loading false immediately after restoring
+        } catch (e) {
+          console.error("Failed to parse stored user:", e);
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+      
+      // Fetch fresh profile to verify token is still valid (runs in background)
+      fetchProfileInternal();
+    } else {
+      console.log("No stored token found");
       setIsLoading(false);
     }
-  };
+  }, [fetchProfileInternal]);
 
   const login = async (credentials: LoginInput) => {
     setIsLoading(true);
@@ -81,18 +117,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (response.data) {
         const data = response.data as any;
+        console.log("Login response:", data);
         const jwtToken = data.accessToken || data.token;
         
         if (jwtToken) {
           setToken(jwtToken);
           localStorage.setItem("auth_token", jwtToken);
           
-          // Set user from response
-          if (data.user) {
-            setUser(data.user);
+          // Set user from response - check both data.user and data.data
+          const userData = data.user || data.data;
+          if (userData) {
+            console.log("Setting user from login:", userData);
+            setUser(userData);
+            localStorage.setItem("auth_user", JSON.stringify(userData));
           } else {
             // Fetch profile to get user data
-            await fetchProfileInternal(jwtToken);
+            await fetchProfileInternal();
           }
           
           toast.success("Login successful!");
@@ -144,14 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    setApiKey(null);
-    localStorage.removeItem("auth_token");
-    toast.success("Logged out successfully");
-  };
-
   const fetchProfile = async () => {
     if (!token) return;
     
@@ -159,7 +191,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiClient.GET("/api/v1/auth/me");
       
       if (response.data) {
-        setUser(response.data as User);
+        const userData = response.data as User;
+        setUser(userData);
+        localStorage.setItem("auth_user", JSON.stringify(userData));
       }
     } catch (error) {
       console.error("Failed to fetch profile:", error);

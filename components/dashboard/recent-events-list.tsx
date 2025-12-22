@@ -80,7 +80,7 @@ export function RecentEventsList({ events, isLoading }: RecentEventsListProps) {
           {events.slice(0, 5).map((event) => (
             <Link
               key={event.id}
-              href={`/dashboard/events/${event.id}`}
+              href={`/dashboard/events/${event.eventId}`}
               className="block"
             >
               <div className="flex items-start gap-4 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">

@@ -10,22 +10,30 @@ import { Calendar, DollarSign, Plus, Ticket, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  
+  // Use userId from the user object
+  const userId = (user as any)?.userId || user?.id;
+
+  console.log("Dashboard - User state:", user);
+  console.log("Dashboard - User ID:", userId);
 
   // Fetch events for this partner
   const { data: eventsData, isLoading } = useQuery({
-    queryKey: ["events", user?.id],
+    queryKey: ["events", userId],
     queryFn: async () => {
+      console.log("Fetching events for user:", userId);
       const response = await apiClient.GET("/api/v1/events", {
         params: {
           query: {
-            partnerId: user?.id,
+            partnerId: userId,
           },
         },
       });
+      console.log("Events response:", response.data);
       return response.data;
     },
-    enabled: !!user?.id,
+    enabled: isAuthenticated && !!userId,
   });
 
   const events = (eventsData as any)?.data || [];
