@@ -47,8 +47,8 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
   });
 
   const [partners, setPartners] = useState<RoyaltyPartner[]>([
-    { partyName: "Artist", percentage: 5, walletAddress: "ArtistWallet123456789012345678901234567" },
-    { partyName: "Venue", percentage: 3, walletAddress: "VenueWallet1234567890123456789012345678" },
+    { partyName: "Artist", percentage: 5, walletAddress: "" },
+    { partyName: "Venue", percentage: 3, walletAddress: "" },
   ]);
 
   const handleCreateEvent = async () => {
@@ -87,7 +87,8 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
       }
 
       const eventData = response.data as any;
-      setCreatedEventId(eventData.id);
+      console.log('eventData', eventData);
+      setCreatedEventId(eventData.eventId);
       setStep("initialize");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create event");
