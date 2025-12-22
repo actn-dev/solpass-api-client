@@ -98,7 +98,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Initialize event on blockchain */
+        /** Initialize event on blockchain (API Key auth) */
         post: operations["EventsController_initializeBlockchain"];
         delete?: never;
         options?: never;
@@ -133,7 +133,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Distribute royalties to party wallets (partners extracted from event.royaltyDistribution)
+         * Distribute royalties to party wallets (API Key auth)
          * @description No request body needed. Partners and their wallet addresses are automatically extracted from the event database. All partners must have USDC token accounts enabled first.
          */
         post: operations["EventsController_distributeRoyalty"];
@@ -187,7 +187,7 @@ export interface paths {
         /** Get all tickets for an event */
         get: operations["TicketsController_getEventTickets"];
         put?: never;
-        /** Purchase or resell a ticket */
+        /** Purchase or resell a ticket (API Key auth required) */
         post: operations["TicketsController_purchaseTicket"];
         delete?: never;
         options?: never;
@@ -204,6 +204,23 @@ export interface paths {
         };
         /** Get ticket details */
         get: operations["TicketsController_getTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/tickets/{ticketId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get ticket transaction history */
+        get: operations["TicketsController_getTicketHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -257,6 +274,40 @@ export interface paths {
         get: operations["AuthController_getProfile"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/api-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get API key for programmatic access (JWT required) */
+        get: operations["AuthController_getApiKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/regenerate-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate API key (invalidates old key, JWT required) */
+        post: operations["AuthController_regenerateApiKey"];
         delete?: never;
         options?: never;
         head?: never;
@@ -773,7 +824,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Unauthorized */
+            /** @description Unauthorized - Invalid API key */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -868,7 +919,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Unauthorized */
+            /** @description Unauthorized - Invalid API key */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1031,6 +1082,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Unauthorized - Invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Event not found */
             404: {
                 headers: {
@@ -1060,6 +1118,34 @@ export interface operations {
                 content?: never;
             };
             /** @description Ticket not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketsController_getTicketHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ticket transaction history retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No history found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1141,6 +1227,60 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Unauthorized - Invalid or expired token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_getApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized - Invalid or expired token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_regenerateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description New API key generated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Unauthorized - Invalid or expired token */
             401: {

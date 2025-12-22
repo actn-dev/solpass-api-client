@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/lib/hooks/use-auth";
 import { ModeProvider } from "@/lib/hooks/use-mode";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SolPass API Client Demo",
-  description: "Third-party integration demo for SolPass ticketing API",
+  title: "SolPass Partner Dashboard",
+  description: "Partner dashboard for SolPass ticketing API",
 };
 
 export default function RootLayout({
@@ -32,7 +33,10 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ModeProvider>
-            <QueryProvider>{children}</QueryProvider>
+            <QueryProvider>
+              {children}
+              <Toaster position="top-right" />
+            </QueryProvider>
           </ModeProvider>
         </AuthProvider>
       </body>

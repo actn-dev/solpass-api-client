@@ -23,9 +23,8 @@ import {
 } from "@/components/ui/dialog";
 
 interface Ticket {
-  id: string;
   ticketId: string;
-  ownerId: string;
+  ownerId?: string;
   ownerWallet: string;
   currentPrice: number;
   originalPrice: number;
@@ -39,9 +38,10 @@ export default function EventDetailPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [resalePrice, setResalePrice] = useState("");
   const [resaleDialogOpen, setResaleDialogOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Fetch event details
-  const { data: event, isLoading: eventLoading, error: eventError } = useQuery({
+  const { data: event, isLoading: eventLoading, error: eventError, refetch: refetchEvent } = useQuery({
     queryKey: ["event", eventId],
     queryFn: async () => {
       const response = await apiClient.GET("/api/v1/events/{id}", {
@@ -52,39 +52,45 @@ export default function EventDetailPage() {
     },
   });
 
+  // Fetch blockchain tickets (already purchased/resale)
+  const { data: blockchainTickets, refetch: refetchTickets } = useQuery({
+    queryKey: ["tickets", eventId],
+    queryFn: async () => {
+      if (!event?.eventId) return [];
+      const response = await apiClient.GET("/api/v1/events/{eventId}/tickets", {
+        params: { path: { eventId: event.eventId } },
+      });
+      if (response.error) return [];
+      return (response.data as any) || [];
+    },
+    enabled: !!event?.eventId && !!event?.blockchainEnabled,
+  });
+
+  console.log("blockchainTickets", blockchainTickets);
   // Convert ticket price to cents for internal calculations
   const ticketPriceInCents = event ? Math.round(parseFloat(event.ticketPrice) * 100) : 10000;
 
-  // Simulate tickets (3 tickets per event)
-  const tickets: Ticket[] = [
-    {
-      id: "1",
-      ticketId: `${event?.eventId || eventId}-ticket-1`,
-      ownerId: "shop-admin",
-      ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
-      currentPrice: ticketPriceInCents,
-      originalPrice: ticketPriceInCents,
-      forSale: true,
-    },
-    {
-      id: "2",
-      ticketId: `${event?.eventId || eventId}-ticket-2`,
-      ownerId: "shop-admin",
-      ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
-      currentPrice: ticketPriceInCents,
-      originalPrice: ticketPriceInCents,
-      forSale: true,
-    },
-    {
-      id: "3",
-      ticketId: `${event?.eventId || eventId}-ticket-3`,
-      ownerId: "shop-admin",
-      ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
-      currentPrice: ticketPriceInCents,
-      originalPrice: ticketPriceInCents,
-      forSale: true,
-    },
-  ];
+  // Generate primary sale tickets (not yet on blockchain)
+  const totalTickets = event?.totalTickets || 0;
+  const primarySaleTickets: Ticket[] = Array.from({ length: totalTickets }, (_, i) => ({
+    ticketId: `${event?.eventId || eventId}-ticket-${i + 1}`,
+    ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
+    currentPrice: ticketPriceInCents,
+    originalPrice: ticketPriceInCents,
+    forSale: true,
+  }));
+
+  // Parse blockchain tickets from API
+  const blockchainTicketsArray = blockchainTickets?.tickets || [];
+  
+  const resaleTickets: Ticket[] = blockchainTicketsArray.map((bt: any) => ({
+    ticketId: bt.ticketId,
+    ownerId: bt.owner,
+    ownerWallet: bt.ownerWallet || getWalletAddress(), // May not be in response
+    currentPrice: bt.ticketPrice || ticketPriceInCents,
+    originalPrice: ticketPriceInCents, // Assume event's original price
+    forSale: true,
+  }));
 
   // Purchase ticket mutation
   const purchaseMutation = useMutation({
@@ -106,6 +112,7 @@ export default function EventDetailPage() {
     },
     onSuccess: () => {
       alert("Ticket purchased successfully!");
+      refetchTickets();
     },
     onError: (error) => {
       alert(`Purchase failed: ${error.message}`);
@@ -136,6 +143,38 @@ export default function EventDetailPage() {
     setResaleDialogOpen(false);
   };
 
+  const handleInitializeBlockchain = async () => {
+    if (!event || event.blockchainEnabled) return;
+    
+    setIsInitializing(true);
+    try {
+      // Step 1: Initialize blockchain
+      const initResponse = await apiClient.POST("/api/v1/events/{id}/initialize-blockchain", {
+        params: { path: { id: eventId } },
+      });
+      
+      if (initResponse.error) {
+        throw new Error("Failed to initialize blockchain");
+      }
+
+      // Step 2: Enable USDC for partners
+      const usdcResponse = await apiClient.POST("/api/v1/events/{id}/enable-partner-usdc", {
+        params: { path: { id: eventId } },
+      });
+      
+      if (usdcResponse.error) {
+        throw new Error("Failed to enable USDC accounts");
+      }
+
+      alert("Blockchain initialized successfully!");
+      refetchEvent();
+    } catch (error) {
+      alert(`Initialization failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   if (eventLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -160,8 +199,15 @@ export default function EventDetailPage() {
     );
   }
 
-  const myTickets = tickets.filter((t) => t.ownerId === getUserId());
-  const availableTickets = tickets.filter((t) => t.forSale && t.ownerId !== getUserId());
+  // My owned tickets (from blockchain)
+  const myTickets = resaleTickets.filter((t) => t.ownerId === getUserId());
+  
+  // Resale market (owned by others)
+  const resaleMarketTickets = resaleTickets.filter((t) => t.ownerId !== getUserId());
+  
+  console.log("xx", resaleTickets)
+  // Primary sale tickets (only show if blockchain is enabled)
+  const availablePrimaryTickets = event?.blockchainEnabled ? primarySaleTickets : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,11 +252,31 @@ export default function EventDetailPage() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Blockchain Status</Label>
-                  <Badge variant={event.blockchainEnabled ? "default" : "secondary"}>
-                    {event.blockchainEnabled ? "✓ Enabled" : "Not Enabled"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={event.blockchainEnabled ? "default" : "secondary"}>
+                      {event.blockchainEnabled ? "✓ Enabled" : "Not Enabled"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
+              
+              {/* Blockchain Initialization Button */}
+              {!event.blockchainEnabled && mode === "admin" && (
+                <div className="mt-4 pt-4 border-t">
+                  <Alert>
+                    <AlertDescription className="mb-3">
+                      This event needs to be initialized on the blockchain before tickets can be sold.
+                    </AlertDescription>
+                  </Alert>
+                  <Button 
+                    onClick={handleInitializeBlockchain} 
+                    disabled={isInitializing}
+                    className="w-full mt-2"
+                  >
+                    {isInitializing ? "Initializing..." : "⛓️ Initialize Blockchain"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -220,7 +286,7 @@ export default function EventDetailPage() {
               <h2 className="text-2xl font-bold mb-4">My Tickets</h2>
               <div className="grid md:grid-cols-3 gap-4">
                 {myTickets.map((ticket) => (
-                  <Card key={ticket.id}>
+                  <Card key={ticket.ticketId}>
                     <CardHeader>
                       <CardTitle className="text-lg">{ticket.ticketId}</CardTitle>
                       <CardDescription>Owned by you</CardDescription>
@@ -248,60 +314,116 @@ export default function EventDetailPage() {
 
           {/* Available Tickets */}
           <div>
-            <h2 className="text-2xl font-bold mb-4">
-              {mode === "admin" ? "Tickets for Sale" : "Buy Tickets"}
-            </h2>
-            {availableTickets.length === 0 && (
+            {/* Primary Sale Section */}
+            {availablePrimaryTickets.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold mb-4">
+                  🎫 Buy from Shop (Primary Sale)
+                </h2>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {availablePrimaryTickets.map((ticket) => (
+                    <Card key={ticket.ticketId}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{ticket.ticketId}</CardTitle>
+                        <CardDescription>
+                          <Badge variant="default">Primary Sale</Badge>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Price:</span>
+                            <span className="font-bold text-lg">
+                              ${(ticket.currentPrice / 100).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                        {mode !== "admin" && (
+                          <Button
+                            className="w-full"
+                            onClick={() => handleBuyTicket(ticket)}
+                            disabled={purchaseMutation.isPending}
+                          >
+                            {purchaseMutation.isPending ? "Purchasing..." : "Buy Ticket"}
+                          </Button>
+                        )}
+                        {mode === "admin" && (
+                          <Button className="w-full" disabled variant="outline">
+                            Admin View Only
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Resale Market Section */}
+            {resaleMarketTickets.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">
+                  🔄 Resale Market
+                </h2>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {resaleMarketTickets.map((ticket) => (
+                    <Card key={ticket.ticketId}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{ticket.ticketId}</CardTitle>
+                        <CardDescription>
+                          <Badge variant="secondary">Resale</Badge>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Price:</span>
+                            <span className="font-bold text-lg">
+                              ${(ticket.currentPrice / 100).toFixed(2)}
+                            </span>
+                          </div>
+                          {ticket.currentPrice !== ticket.originalPrice && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Original:</span>
+                              <span className="line-through">
+                                ${(ticket.originalPrice / 100).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {mode !== "admin" && (
+                          <Button
+                            className="w-full"
+                            onClick={() => handleBuyTicket(ticket)}
+                            disabled={purchaseMutation.isPending}
+                          >
+                            {purchaseMutation.isPending ? "Purchasing..." : "Buy Resale Ticket"}
+                          </Button>
+                        )}
+                        {mode === "admin" && (
+                          <Button className="w-full" disabled variant="outline">
+                            Admin View Only
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No tickets available */}
+            {availablePrimaryTickets.length === 0 && resaleMarketTickets.length === 0 && (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No tickets available for purchase.</p>
+                  <p className="text-muted-foreground">
+                    {!event?.blockchainEnabled 
+                      ? "Event blockchain not initialized yet. Admin needs to enable it first."
+                      : "No tickets available for purchase."}
+                  </p>
                 </CardContent>
               </Card>
             )}
-            <div className="grid md:grid-cols-3 gap-4">
-              {availableTickets.map((ticket) => (
-                <Card key={ticket.id}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{ticket.ticketId}</CardTitle>
-                    <CardDescription>
-                      {ticket.ownerId === "shop-admin" ? "Primary Sale" : "Resale"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Price:</span>
-                        <span className="font-bold text-lg">
-                          ${(ticket.currentPrice / 100).toFixed(2)}
-                        </span>
-                      </div>
-                      {ticket.currentPrice !== ticket.originalPrice && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Original:</span>
-                          <span className="line-through">
-                            ${(ticket.originalPrice / 100).toFixed(2)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {mode !== "admin" && (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleBuyTicket(ticket)}
-                        disabled={purchaseMutation.isPending}
-                      >
-                        {purchaseMutation.isPending ? "Purchasing..." : "Buy Ticket"}
-                      </Button>
-                    )}
-                    {mode === "admin" && (
-                      <Button className="w-full" disabled variant="outline">
-                        Admin View Only
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
           </div>
 
           {/* Resale Dialog */}
