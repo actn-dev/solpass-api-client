@@ -11,14 +11,24 @@ function createAuthenticatedClient() {
   client.use({
     async onRequest({ request }) {
       const token = localStorage.getItem("auth_token");
-      if (token) {
-        request.headers.set("Authorization", `Bearer ${token}`);
-      }
-      
-      // Check for API key in request headers (for platform operations)
       const apiKey = localStorage.getItem("platform_api_key");
-      if (apiKey && !token) {
-        request.headers.set("x-api-key", apiKey);
+      
+      // Determine which auth to use based on the current page
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPlatformSimulation = currentPath.startsWith('/events');
+      
+      if (isPlatformSimulation && apiKey) {
+        // Platform simulation pages use API key
+        // request.headers.set("x-api-key", apiKey);
+        request.headers.set("Authorization", `Bearer ${apiKey}`);
+        // console.log("Using API key for request to:", request.url);
+        // console.log("API key being sent:", apiKey.substring(0, 20) + "...");
+      } else if (token) {
+        // Dashboard pages use JWT token
+        request.headers.set("Authorization", `Bearer ${token}`);
+        // console.log("Using JWT token for request to:", request.url);
+      } else {
+        console.warn("No authentication found for request to:", request.url);
       }
       
       return request;

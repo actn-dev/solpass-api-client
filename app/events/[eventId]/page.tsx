@@ -224,7 +224,6 @@ export default function EventDetailPage() {
   // Resale market (owned by others)
   const resaleMarketTickets = resaleTickets.filter((t) => t.ownerId !== getUserId());
   
-  console.log("xx", resaleTickets)
   // Primary sale tickets (only show if blockchain is enabled)
   const availablePrimaryTickets = event?.blockchainEnabled ? primarySaleTickets : [];
 
