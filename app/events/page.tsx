@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useMode } from "@/lib/hooks/use-mode";
+import { usePlatform } from "@/lib/hooks/use-platform";
 import { ModeSwitcher } from "@/components/mode-switcher";
+import { PlatformHeader } from "@/components/platform/platform-header";
+import { UserSwitcher } from "@/components/platform/user-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +17,7 @@ import { CreateEventDialog } from "@/components/create-event-dialog";
 
 export default function EventsPage() {
   const { mode } = useMode();
+  const { isConfigured } = usePlatform();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: eventsResponse, isLoading, error, refetch } = useQuery({
@@ -29,25 +33,43 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PlatformHeader />
+      
       <div className="container mx-auto py-8 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Events</h1>
+              <h1 className="text-3xl font-bold mb-2">Events Platform</h1>
               <p className="text-muted-foreground">
-                {mode === "admin" ? "Manage your events" : "Browse and buy tickets"}
+                {mode === "admin" ? "Create and manage your ticketed events" : "Browse and buy tickets"}
               </p>
             </div>
-            <Link href="/">
-              <Button variant="outline">← Back to Home</Button>
+            <Link href="/dashboard">
+              <Button variant="outline">← Back to Dashboard</Button>
             </Link>
           </div>
 
-          <ModeSwitcher />
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <UserSwitcher />
+            <div>
+              <ModeSwitcher />
+            </div>
+          </div>
 
           {mode === "admin" && (
             <div className="mb-6">
-              <Button onClick={() => setCreateDialogOpen(true)} size="lg">
+              {!isConfigured && (
+                <Alert className="mb-4">
+                  <AlertDescription>
+                    Configure your API key to create events via the blockchain.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Button 
+                onClick={() => setCreateDialogOpen(true)} 
+                size="lg"
+                disabled={!isConfigured}
+              >
                 + Create New Event
               </Button>
             </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { usePlatform } from "@/lib/hooks/use-platform";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ interface RoyaltyPartner {
 }
 
 export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEventDialogProps) {
+  const { apiKey, isConfigured } = usePlatform();
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<"create" | "initialize" | "enable-usdc" | "complete">("create");
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,11 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
   ]);
 
   const handleCreateEvent = async () => {
+    if (!isConfigured || !apiKey) {
+      setError("Please configure your API key first");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -90,14 +97,16 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
   };
 
   const handleInitializeBlockchain = async () => {
-    if (!createdEventId) return;
+    if (!createdEventId || !apiKey) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await apiClient.POST("/api/v1/events/{id}/initialize-blockchain", {
-        params: { path: { id: createdEventId } },
+        params: { 
+          path: { id: createdEventId },
+        },
       });
 
       if (response.error) {
@@ -113,14 +122,16 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
   };
 
   const handleEnableUSDC = async () => {
-    if (!createdEventId) return;
+    if (!createdEventId || !apiKey) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await apiClient.POST("/api/v1/events/{id}/enable-partner-usdc", {
-        params: { path: { id: createdEventId } },
+        params: { 
+          path: { id: createdEventId },
+        },
       });
 
       if (response.error) {

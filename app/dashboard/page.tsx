@@ -1,13 +1,13 @@
 "use client";
 
-import { useAuth } from "@/lib/hooks/use-auth";
-import { StatsCard } from "@/components/dashboard/stats-card";
 import { RecentEventsList } from "@/components/dashboard/recent-events-list";
+import { StatsCard } from "@/components/dashboard/stats-card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Ticket, DollarSign, TrendingUp, Plus } from "lucide-react";
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { Calendar, DollarSign, Plus, Ticket, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -90,10 +90,10 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-4">
-        <Link href="/dashboard/events/new">
+        <Link href="/events">
           <Button size="lg" className="gap-2">
             <Plus className="h-5 w-5" />
-            Create New Event
+            Create Event on Platform
           </Button>
         </Link>
         <Link href="/dashboard/events">

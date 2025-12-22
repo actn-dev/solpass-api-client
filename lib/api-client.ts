@@ -14,6 +14,13 @@ function createAuthenticatedClient() {
       if (token) {
         request.headers.set("Authorization", `Bearer ${token}`);
       }
+      
+      // Check for API key in request headers (for platform operations)
+      const apiKey = localStorage.getItem("platform_api_key");
+      if (apiKey && !token) {
+        request.headers.set("x-api-key", apiKey);
+      }
+      
       return request;
     },
   });

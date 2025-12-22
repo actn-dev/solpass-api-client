@@ -6,7 +6,10 @@ import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useMode } from "@/lib/hooks/use-mode";
+import { usePlatform } from "@/lib/hooks/use-platform";
 import { ModeSwitcher } from "@/components/mode-switcher";
+import { PlatformHeader } from "@/components/platform/platform-header";
+import { UserSwitcher } from "@/components/platform/user-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +38,7 @@ export default function EventDetailPage() {
   const params = useParams();
   const eventId = params.eventId as string;
   const { mode, getWalletAddress, getUserId } = useMode();
+  const { apiKey, isConfigured } = usePlatform();
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [resalePrice, setResalePrice] = useState("");
   const [resaleDialogOpen, setResaleDialogOpen] = useState(false);
@@ -95,8 +99,14 @@ export default function EventDetailPage() {
   // Purchase ticket mutation
   const purchaseMutation = useMutation({
     mutationFn: async (ticket: Ticket) => {
+      if (!isConfigured || !apiKey) {
+        throw new Error("API key not configured");
+      }
+      
       const response = await apiClient.POST("/api/v1/events/{eventId}/tickets", {
-        params: { path: { eventId: event.eventId } },
+        params: { 
+          path: { eventId: event.eventId },
+        },
         body: {
           ticketId: ticket.ticketId,
           buyerWallet: getWalletAddress(),
@@ -104,7 +114,7 @@ export default function EventDetailPage() {
           newPrice: ticket.currentPrice,
           originalPrice: ticket.originalPrice,
           buyerId: getUserId(),
-          sellerId: ticket.ownerId,
+          sellerId: ticket.ownerId || "unknown",
         },
       });
       if (response.error) throw new Error("Failed to purchase ticket");
@@ -146,11 +156,18 @@ export default function EventDetailPage() {
   const handleInitializeBlockchain = async () => {
     if (!event || event.blockchainEnabled) return;
     
+    if (!isConfigured || !apiKey) {
+      alert("Please configure your API key first");
+      return;
+    }
+    
     setIsInitializing(true);
     try {
       // Step 1: Initialize blockchain
       const initResponse = await apiClient.POST("/api/v1/events/{id}/initialize-blockchain", {
-        params: { path: { id: eventId } },
+        params: { 
+          path: { id: eventId },
+        },
       });
       
       if (initResponse.error) {
@@ -159,7 +176,9 @@ export default function EventDetailPage() {
 
       // Step 2: Enable USDC for partners
       const usdcResponse = await apiClient.POST("/api/v1/events/{id}/enable-partner-usdc", {
-        params: { path: { id: eventId } },
+        params: { 
+          path: { id: eventId },
+        },
       });
       
       if (usdcResponse.error) {
@@ -211,6 +230,8 @@ export default function EventDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PlatformHeader />
+      
       <div className="container mx-auto py-8 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6">
@@ -223,7 +244,12 @@ export default function EventDetailPage() {
             </Link>
           </div>
 
-          <ModeSwitcher />
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <UserSwitcher />
+            <div>
+              <ModeSwitcher />
+            </div>
+          </div>
 
           {/* Event Details */}
           <Card className="mb-6">
@@ -266,11 +292,12 @@ export default function EventDetailPage() {
                   <Alert>
                     <AlertDescription className="mb-3">
                       This event needs to be initialized on the blockchain before tickets can be sold.
+                      {!isConfigured && " Please configure your API key first."}
                     </AlertDescription>
                   </Alert>
                   <Button 
                     onClick={handleInitializeBlockchain} 
-                    disabled={isInitializing}
+                    disabled={isInitializing || !isConfigured}
                     className="w-full mt-2"
                   >
                     {isInitializing ? "Initializing..." : "⛓️ Initialize Blockchain"}
