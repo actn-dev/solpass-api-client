@@ -74,19 +74,26 @@ export default function EventDetailPage() {
   // Convert ticket price to cents for internal calculations
   const ticketPriceInCents = event ? Math.round(parseFloat(event.ticketPrice) * 100) : 10000;
 
-  // Generate primary sale tickets (not yet on blockchain)
-  const totalTickets = event?.totalTickets || 0;
-  const primarySaleTickets: Ticket[] = Array.from({ length: totalTickets }, (_, i) => ({
-    ticketId: `${event?.eventId || eventId}-ticket-${i + 1}`,
-    ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
-    currentPrice: ticketPriceInCents,
-    originalPrice: ticketPriceInCents,
-    forSale: true,
-  }));
-
   // Parse blockchain tickets from API
   const blockchainTicketsArray = blockchainTickets?.tickets || [];
   
+  // Create a Set of sold ticket IDs for quick lookup
+  const soldTicketIds = new Set(blockchainTicketsArray.map((bt: any) => bt.ticketId));
+
+  // Generate primary sale tickets (only those NOT yet on blockchain)
+  const totalTickets = event?.totalTickets || 0;
+  const primarySaleTickets: Ticket[] = Array.from({ length: totalTickets }, (_, i) => {
+    const ticketId = `${event?.eventId || eventId}-ticket-${i + 1}`;
+    return {
+      ticketId,
+      ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
+      currentPrice: ticketPriceInCents,
+      originalPrice: ticketPriceInCents,
+      forSale: true,
+    };
+  }).filter(ticket => !soldTicketIds.has(ticket.ticketId)); // Only show unsold tickets
+
+  // Resale tickets - tickets that have been sold and are on blockchain
   const resaleTickets: Ticket[] = blockchainTicketsArray.map((bt: any) => ({
     ticketId: bt.ticketId,
     ownerId: bt.owner,

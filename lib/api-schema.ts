@@ -62,7 +62,7 @@ export interface paths {
         /** Get all events with filtering and pagination */
         get: operations["EventsController_findAll"];
         put?: never;
-        /** Create a new event (database only, blockchain init separate) */
+        /** Create a new event (API Key auth - database only, blockchain init separate) */
         post: operations["EventsController_createEvent"];
         delete?: never;
         options?: never;
@@ -169,8 +169,68 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Enable USDC token accounts for all partners (server wallet pays for creation) */
+        /** Enable USDC token accounts for all partners (JWT or API Key auth) */
         post: operations["EventsController_enablePartnerUsdcAccounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/analytics/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get daily transaction analytics for an event
+         * @description Returns daily purchase/resell counts and revenue. Defaults to last 30 days if no date range provided.
+         */
+        get: operations["EventsController_getDailyAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/analytics/revenue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get revenue breakdown for an event
+         * @description Returns primary vs secondary revenue, royalties collected/distributed, and price statistics.
+         */
+        get: operations["EventsController_getRevenueBreakdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/analytics/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ticket distribution analytics
+         * @description Returns tickets grouped by status, resell count, price distribution, and top tickets.
+         */
+        get: operations["EventsController_getTicketDistribution"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -184,11 +244,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get all tickets for an event */
+        /** Get all tickets for an event with optional filters */
         get: operations["TicketsController_getEventTickets"];
         put?: never;
         /** Purchase or resell a ticket (API Key auth required) */
         post: operations["TicketsController_purchaseTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/tickets/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get available tickets for an event
+         * @description Returns unsold tickets and active marketplace listings for resale
+         */
+        get: operations["TicketsController_getAvailableTickets"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -221,6 +301,26 @@ export interface paths {
         };
         /** Get ticket transaction history */
         get: operations["TicketsController_getTicketHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/my-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all tickets owned by a wallet address
+         * @description Returns all tickets owned by the specified wallet address across all events, grouped by event with portfolio statistics.
+         */
+        get: operations["TicketsGlobalController_getMyTickets"];
         put?: never;
         post?: never;
         delete?: never;
@@ -659,7 +759,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Unauthorized */
+            /** @description Unauthorized - Invalid API key */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1010,6 +1110,81 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Unauthorized - Invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden - not event owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EventsController_getDailyAnalytics: {
+        parameters: {
+            query?: {
+                /** @description Start date for analytics (YYYY-MM-DD) */
+                startDate?: string;
+                /** @description End date for analytics (YYYY-MM-DD) */
+                endDate?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily analytics retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EventsController_getRevenueBreakdown: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revenue breakdown retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Unauthorized */
             401: {
                 headers: {
@@ -1033,9 +1208,48 @@ export interface operations {
             };
         };
     };
-    TicketsController_getEventTickets: {
+    EventsController_getTicketDistribution: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ticket distribution analytics retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketsController_getEventTickets: {
+        parameters: {
+            query?: {
+                /** @description Filter by ticket status */
+                status?: "active" | "used" | "cancelled";
+                /** @description Minimum ticket price */
+                minPrice?: number;
+                /** @description Maximum ticket price */
+                maxPrice?: number;
+                /** @description Maximum resell count */
+                maxResellCount?: number;
+                /** @description Filter by current owner wallet address */
+                owner?: string;
+            };
             header?: never;
             path: {
                 eventId: string;
@@ -1044,7 +1258,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description All tickets for event retrieved from blockchain */
+            /** @description Filtered tickets for event retrieved from blockchain */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1084,6 +1298,33 @@ export interface operations {
             };
             /** @description Unauthorized - Invalid API key */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketsController_getAvailableTickets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available tickets retrieved successfully */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1147,6 +1388,34 @@ export interface operations {
             };
             /** @description No history found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketsGlobalController_getMyTickets: {
+        parameters: {
+            query: {
+                /** @description Wallet address or user ID to query tickets for */
+                walletAddress: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User tickets retrieved successfully with portfolio stats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request - invalid wallet address */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -4,7 +4,8 @@ import type { paths } from "./api-schema";
 // Create a typed API client with dynamic auth token
 function createAuthenticatedClient() {
   const client = createClient<paths>({
-    baseUrl: "https://api.solpass.app",
+    // baseUrl: "https://api.solpass.app",
+    baseUrl: "http://localhost:3000",
     
   });
 
