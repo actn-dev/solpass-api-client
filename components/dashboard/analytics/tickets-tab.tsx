@@ -37,18 +37,24 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
     },
   });
 
-  // Fetch tickets list
-  const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
-    queryKey: ["event-tickets", eventId],
+  // Fetch all transactions for the event
+  const { data: transactionsData, isLoading: transactionsLoading, error: transactionsError } = useQuery({
+    queryKey: ["event-transactions", eventId],
     queryFn: async () => {
-      const response = await apiClient.GET("/api/v1/events/{eventId}/tickets", {
-        params: { path: { eventId: eventId } },
+      console.log("Fetching transactions for eventId:", eventId);
+      const response = await apiClient.GET("/api/v1/events/{id}/transactions", {
+        params: { path: { id: eventId } },
       });
-      return (response.data as any)?.tickets || [];
+      console.log("Transactions response:", response.data);
+      return (response.data as any)?.transactions || [];
     },
   });
 
-  const isLoading = distributionLoading || ticketsLoading;
+  const isLoading = distributionLoading || transactionsLoading;
+
+  if (transactionsError) {
+    console.error("Error fetching transactions:", transactionsError);
+  }
 
   if (isLoading) {
     return (
@@ -74,21 +80,27 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
   }
 
   const distribution = (ticketDistribution as any) || {};
-  const tickets = ticketsData || [];
+  const transactions = transactionsData || [];
+
+  console.log("Distribution data:", distribution);
+  console.log("Transactions data:", transactions);
+  console.log("Transactions length:", transactions.length);
 
   // Prepare data for pie chart
   const distributionData = [
-    { name: "Active", value: distribution.activeTickets || 0, color: STATUS_COLORS.ACTIVE },
-    { name: "Used", value: distribution.usedTickets || 0, color: STATUS_COLORS.USED },
-    { name: "Resold", value: distribution.resoldTickets || 0, color: STATUS_COLORS.RESOLD },
-    { name: "Cancelled", value: distribution.cancelledTickets || 0, color: STATUS_COLORS.CANCELLED },
+    { name: "Active", value: distribution.byStatus?.active || 0, color: STATUS_COLORS.ACTIVE },
+    { name: "Used", value: distribution.byStatus?.used || 0, color: STATUS_COLORS.USED },
+    { name: "Cancelled", value: distribution.byStatus?.cancelled || 0, color: STATUS_COLORS.CANCELLED },
   ].filter(item => item.value > 0);
 
-  // Filter tickets
-  const filteredTickets = tickets.filter((ticket: any) => {
-    const matchesSearch = ticket.ticketId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.ownerWallet?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
+  // Filter transactions
+  const filteredTransactions = transactions.filter((tx: any) => {
+    const matchesSearch = tx.ticketId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.toOwner?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.fromOwner?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || 
+                         (statusFilter === "PURCHASE" && tx.transactionType === "purchase") ||
+                         (statusFilter === "RESELL" && tx.transactionType === "resell");
     return matchesSearch && matchesStatus;
   });
 
@@ -98,11 +110,24 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Sold</CardTitle>
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{distribution.activeTickets || 0}</div>
+            <div className="text-2xl font-bold">{distribution.summary?.ticketsSold || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              of {eventData.totalTickets} tickets
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Tickets</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{distribution.byStatus?.active || 0}</div>
             <p className="text-xs text-muted-foreground">
               Currently valid
             </p>
@@ -111,39 +136,26 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Used Tickets</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{distribution.usedTickets || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Redeemed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resold Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium">Resale Count</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{distribution.resoldTickets || 0}</div>
+            <div className="text-2xl font-bold">{distribution.byResellCount?.resoldOnce || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Secondary sales
+              Resold at least once
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tickets.length}</div>
+            <div className="text-2xl font-bold">{transactions.length}</div>
             <p className="text-xs text-muted-foreground">
-              of {eventData.totalTickets}
+              All buys & resells
             </p>
           </CardContent>
         </Card>
@@ -211,17 +223,17 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
                   <div className="text-xs text-muted-foreground">Tickets sold vs capacity</div>
                 </div>
                 <div className="text-lg font-bold">
-                  {((tickets.length / eventData.totalTickets) * 100).toFixed(1)}%
+                  {(((distribution.summary?.ticketsSold || 0) / eventData.totalTickets) * 100).toFixed(1)}%
                 </div>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
                   <div className="font-medium">Resale Rate</div>
-                  <div className="text-xs text-muted-foreground">Tickets resold</div>
+                  <div className="text-xs text-muted-foreground">Tickets resold at least once</div>
                 </div>
                 <div className="text-lg font-bold">
-                  {tickets.length > 0 ? (((distribution.resoldTickets || 0) / tickets.length) * 100).toFixed(1) : 0}%
+                  {(distribution.summary?.ticketsSold || 0) > 0 ? (((distribution.byResellCount?.resoldOnce || 0) / (distribution.summary?.ticketsSold || 1)) * 100).toFixed(1) : 0}%
                 </div>
               </div>
 
@@ -231,7 +243,7 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
                   <div className="text-xs text-muted-foreground">Tickets redeemed</div>
                 </div>
                 <div className="text-lg font-bold">
-                  {tickets.length > 0 ? (((distribution.usedTickets || 0) / tickets.length) * 100).toFixed(1) : 0}%
+                  {(distribution.summary?.ticketsSold || 0) > 0 ? (((distribution.byStatus?.used || 0) / (distribution.summary?.ticketsSold || 1)) * 100).toFixed(1) : 0}%
                 </div>
               </div>
 
@@ -241,7 +253,7 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
                   <div className="text-xs text-muted-foreground">Remaining tickets</div>
                 </div>
                 <div className="text-xl font-bold text-primary">
-                  {eventData.totalTickets - tickets.length}
+                  {eventData.totalTickets - (distribution.summary?.ticketsSold || 0)}
                 </div>
               </div>
             </div>
@@ -268,45 +280,60 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="USED">Used</SelectItem>
-                <SelectItem value="RESOLD">Resold</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="PURCHASE">Initial Purchase</SelectItem>
+                <SelectItem value="RESELL">Resale</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Tickets List */}
-          {filteredTickets.length === 0 ? (
+          {/* Transactions List */}
+          {filteredTransactions.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              {tickets.length === 0 ? "No tickets sold yet" : "No tickets match your filters"}
+              {transactions.length === 0 ? "No transactions yet" : "No transactions match your filters"}
             </div>
           ) : (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {filteredTickets.map((ticket: any, index: number) => (
+              {filteredTransactions.map((tx: any, index: number) => (
                 <div
                   key={index}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
-                      <code className="font-mono text-sm font-medium">{ticket.ticketId}</code>
-                      <Badge variant={ticket.status === "ACTIVE" ? "default" : "secondary"}>
-                        {ticket.status || "ACTIVE"}
+                      <code className="font-mono text-sm font-medium">{tx.ticketId}</code>
+                      <Badge variant={tx.transactionType === "purchase" ? "default" : "secondary"}>
+                        {tx.transactionType === "purchase" ? "INITIAL SALE" : "RESALE"}
                       </Badge>
+                      {tx.status && (
+                        <Badge variant="outline" className="text-xs">
+                          {tx.status}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      <Wallet className="h-3 w-3" />
-                      <span className="font-mono">
-                        {ticket.ownerWallet?.slice(0, 8)}...{ticket.ownerWallet?.slice(-6)}
-                      </span>
-                      {ticket.transactionSignature && (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div className="flex items-center gap-2">
+                        {tx.fromOwner ? (
+                          <>
+                            <span className="font-mono">
+                              {tx.fromOwner.slice(0, 8)}...{tx.fromOwner.slice(-6)}
+                            </span>
+                            <span>→</span>
+                          </>
+                        ) : (
+                          <span className="text-xs">Initial Sale →</span>
+                        )}
+                        <Wallet className="h-3 w-3" />
+                        <span className="font-mono">
+                          {tx.toOwner.slice(0, 8)}...{tx.toOwner.slice(-6)}
+                        </span>
+                      </div>
+                      {tx.blockchainTxHash && (
                         <a 
-                          href={`https://explorer.solana.com/tx/${ticket.transactionSignature}?cluster=devnet`}
+                          href={`https://explorer.solana.com/tx/${tx.blockchainTxHash}?cluster=devnet`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 hover:text-primary"
@@ -315,13 +342,13 @@ export function TicketsTab({ eventId, eventData }: TicketsTabProps) {
                           <span>View on Solana</span>
                         </a>
                       )}
+                      <div className="text-xs">
+                        {new Date(tx.createdAt).toLocaleString()}
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium">${ticket.ticketPrice}</div>
-                    <Badge variant="outline" className="text-xs">
-                      {ticket.transactionType || "INITIAL_SALE"}
-                    </Badge>
+                    <div className="font-medium text-lg">${tx.price.toFixed(2)}</div>
                   </div>
                 </div>
               ))}

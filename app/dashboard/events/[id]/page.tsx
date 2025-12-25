@@ -122,19 +122,19 @@ export default function EventDetailsPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <OverviewTab eventId={id as string} event={eventData} />
+          <OverviewTab eventId={eventData.eventId} event={eventData} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <AnalyticsTab eventId={id as string} />
+          <AnalyticsTab eventId={eventData.eventId} />
         </TabsContent>
 
         <TabsContent value="revenue" className="space-y-4">
-          <RevenueTab eventId={id as string} />
+          <RevenueTab eventId={eventData.eventId} />
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
-          <TicketsTab eventId={id as string} eventData={eventData} />
+          <TicketsTab eventId={eventData.eventId} eventData={eventData} />
         </TabsContent>
       </Tabs>
     </div>

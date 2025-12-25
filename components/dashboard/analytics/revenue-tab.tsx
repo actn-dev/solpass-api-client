@@ -43,28 +43,30 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
     );
   }
 
+  const data = revenueData as any;
+  
   const {
-    totalRevenue = 0,
-    initialSalesRevenue = 0,
-    resaleRevenue = 0,
-    platformFees = 0,
-    royaltyDistribution = [],
-  } = revenueData;
+    revenue = {},
+    transactions = {},
+    royalties = {},
+    priceStatistics = {},
+  } = data;
+
+  const totalRevenue = revenue.totalRevenue || 0;
+  const initialSalesRevenue = revenue.primaryRevenue || 0;
+  const resaleRevenue = revenue.secondaryRevenue || 0;
+  const platformFees = royalties.estimatedRoyalties || 0;
+  const royaltyPercentage = royalties.royaltyPercentage || 0;
+  const pendingRoyalties = royalties.pendingRoyalties || 0;
+  const royaltiesDistributed = royalties.royaltiesDistributed || 0;
 
   // Prepare data for revenue source pie chart
   const revenueSourceData = [
-    { name: "Initial Sales", value: initialSalesRevenue, color: "hsl(var(--primary))" },
+    { name: "Primary Sales", value: initialSalesRevenue, color: "hsl(var(--primary))" },
     { name: "Resale Revenue", value: resaleRevenue, color: "hsl(var(--chart-2))" },
   ].filter(item => item.value > 0);
 
-  // Prepare data for partner distribution bar chart
-  const partnerData = royaltyDistribution.map((partner: any) => ({
-    name: partner.partyName || "Partner",
-    amount: partner.amount || 0,
-    percentage: partner.percentage || 0,
-  }));
-
-  // Calculate net revenue after fees
+  // Calculate net revenue after royalties
   const netRevenue = totalRevenue - platformFees;
 
   return (
@@ -215,48 +217,6 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
           </CardContent>
         </Card>
       </div>
-
-      {/* Royalty Partner Distribution */}
-      {partnerData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Royalty Distribution</CardTitle>
-            <CardDescription>
-              Revenue allocation to partners
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={partnerData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="name" 
-                  className="text-xs fill-muted-foreground"
-                />
-                <YAxis 
-                  className="text-xs fill-muted-foreground"
-                  tickFormatter={(value) => `$${value}`}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [`$${Number(value).toFixed(2)}`, "Amount"]}
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))", 
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                />
-                <Legend />
-                <Bar 
-                  dataKey="amount" 
-                  fill="hsl(var(--primary))" 
-                  name="Revenue Share"
-                  label={{ position: 'top' }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

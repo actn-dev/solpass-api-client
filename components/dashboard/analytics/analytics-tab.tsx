@@ -18,7 +18,7 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
       const response = await apiClient.GET("/api/v1/events/{id}/analytics/daily", {
         params: { path: { id: eventId } },
       });
-      return (response.data as any)?.dailySales || [];
+      return (response.data as any)?.dailyStats || [];
     },
   });
 
@@ -46,9 +46,11 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
   // Format data for charts
   const chartData = dailyData.map((day: any) => ({
     date: new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    sales: day.ticketsSold || 0,
-    revenue: day.revenue || 0,
-    resales: day.resales || 0,
+    sales: day.purchaseCount || 0,
+    revenue: day.totalRevenue || 0,
+    resales: day.resellCount || 0,
+    primaryRevenue: day.purchaseRevenue || 0,
+    secondaryRevenue: day.resellRevenue || 0,
   }));
 
   // Calculate summary stats
