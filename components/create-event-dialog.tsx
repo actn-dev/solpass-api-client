@@ -43,7 +43,7 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
     venue: "",
     eventDate: "",
     totalTickets: 100,
-    ticketPrice: 10000, // $100.00 in cents
+    ticketPrice: 100, // $100.00 in USD
   });
 
   const [partners, setPartners] = useState<RoyaltyPartner[]>([
@@ -156,7 +156,7 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
       venue: "",
       eventDate: "",
       totalTickets: 100,
-      ticketPrice: 10000,
+      ticketPrice: 100,
     });
     setPartners([
       { partyName: "Artist", percentage: 5, walletAddress: "ArtistWallet123456789012345678901234567" },
@@ -273,15 +273,18 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEvent
                 />
               </div>
               <div>
-                <Label htmlFor="ticketPrice">Ticket Price (cents)</Label>
+                <Label htmlFor="ticketPrice">Ticket Price (USD)</Label>
                 <Input
                   id="ticketPrice"
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={formData.ticketPrice}
-                  onChange={(e) => setFormData({ ...formData, ticketPrice: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, ticketPrice: parseFloat(e.target.value) || 0 })}
+                  placeholder="100.00"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  ${(formData.ticketPrice / 100).toFixed(2)}
+                  Amount in US Dollars
                 </p>
               </div>
             </div>

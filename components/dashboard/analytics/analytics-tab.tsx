@@ -61,11 +61,20 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Info Banner */}
+      <Card className="bg-muted/50">
+        <CardContent className="py-3">
+          <p className="text-sm text-muted-foreground">
+            <strong>Note:</strong> Charts below show transaction volume over time. Actual distributable revenue (from resale profits only) is shown in the Revenue tab.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Initial Sales</CardTitle>
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -78,20 +87,20 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resales</CardTitle>
+            <CardTitle className="text-sm font-medium">Resale Transactions</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalResales}</div>
             <p className="text-xs text-muted-foreground">
-              {totalSales > 0 ? ((totalResales / totalSales) * 100).toFixed(1) : 0}% of sales
+              {totalSales > 0 ? ((totalResales / totalSales) * 100).toFixed(1) : 0}% of initial sales
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Transaction Volume</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -157,7 +166,7 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
                 stroke="hsl(var(--primary))" 
                 fillOpacity={1} 
                 fill="url(#colorSales)" 
-                name="Initial Sales"
+                name="Initial Sales Count"
               />
               <Area 
                 type="monotone" 
@@ -165,19 +174,19 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
                 stroke="hsl(var(--destructive))" 
                 fillOpacity={1} 
                 fill="url(#colorResales)" 
-                name="Resales"
+                name="Resale Count"
               />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {/* Daily Revenue Chart */}
+      {/* Daily Transaction Volume Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Revenue</CardTitle>
+          <CardTitle>Daily Transaction Volume</CardTitle>
           <CardDescription>
-            Revenue generated per day in USD
+            Total sales and resales per day in USD
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -198,7 +207,7 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "var(--radius)",
                 }}
-                formatter={(value) => [`$${Number(value).toFixed(2)}`, "Revenue"]}
+                formatter={(value) => [`$${Number(value).toFixed(2)}`, "Volume"]}
               />
               <Legend />
               <Line 
@@ -207,7 +216,7 @@ export function AnalyticsTab({ eventId }: AnalyticsTabProps) {
                 stroke="hsl(var(--primary))" 
                 strokeWidth={2}
                 dot={{ fill: "hsl(var(--primary))" }}
-                name="Revenue"
+                name="Transaction Volume"
               />
             </LineChart>
           </ResponsiveContainer>

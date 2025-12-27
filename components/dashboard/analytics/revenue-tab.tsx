@@ -50,24 +50,41 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
     transactions = {},
     royalties = {},
     priceStatistics = {},
+    partnerShares = [],
+    platformShare = 0,
   } = data;
 
-  const totalRevenue = revenue.totalRevenue || 0;
-  const initialSalesRevenue = revenue.primaryRevenue || 0;
-  const resaleRevenue = revenue.secondaryRevenue || 0;
-  const platformFees = royalties.estimatedRoyalties || 0;
+  // ✅ Main revenue from escrow (distributable)
+  const totalDistributableRevenue = revenue.totalDistributableRevenue || revenue.escrowBalance || 0;
+  
+  // Breakdown from DB (for display only, not actual revenue)
+  const primarySalesVolume = revenue.primarySalesVolume || 0;
+  const primarySalesCount = revenue.primarySalesCount || 0;
+  const resaleVolume = revenue.resaleVolume || 0;
+  const resaleProfit = revenue.resaleProfit || totalDistributableRevenue;
+  const resaleCount = transactions.resales || 0;
+
+  // Partner share calculation (show first partner for now, or sum all)
+  const totalPartnerShare = partnerShares.reduce((sum: number, p: any) => sum + (p.estimatedShare || 0), 0);
   const royaltyPercentage = royalties.royaltyPercentage || 0;
-  const pendingRoyalties = royalties.pendingRoyalties || 0;
+  
+  // Distribution info
+  const pendingDistribution = royalties.pendingDistribution || totalDistributableRevenue;
   const royaltiesDistributed = royalties.royaltiesDistributed || 0;
 
-  // Prepare data for revenue source pie chart
+  // Prepare data for revenue source pie chart (showing profit breakdown)
   const revenueSourceData = [
-    { name: "Primary Sales", value: initialSalesRevenue, color: "hsl(var(--primary))" },
-    { name: "Resale Revenue", value: resaleRevenue, color: "hsl(var(--chart-2))" },
+    { name: "Resale Profit", value: resaleProfit, color: "hsl(var(--chart-2))" },
   ].filter(item => item.value > 0);
 
-  // Calculate net revenue after royalties
-  const netRevenue = totalRevenue - platformFees;
+  // If there are partner shares, show distribution breakdown (partners only - 100% split)
+  const distributionData = partnerShares.length > 0 
+    ? partnerShares.map((p: any, i: number) => ({
+        name: `${p.partyName || `Partner ${i + 1}`} (${p.percentage}%)`,
+        value: p.estimatedShare,
+        color: `hsl(var(--chart-${(i % 5) + 1}))`,
+      })).filter(item => item.value > 0)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -75,72 +92,72 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Distributable Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${totalDistributableRevenue.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              Gross income
+              100% from escrow (resale profits)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
+            <CardTitle className="text-sm font-medium">Partner Share</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${platformFees.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${totalPartnerShare.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              {totalRevenue > 0 ? ((platformFees / totalRevenue) * 100).toFixed(1) : 0}% of revenue
+              100% of revenue (split by ratio)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Primary Sales Volume</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${netRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${primarySalesVolume.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              After fees
+              {primarySalesCount} initial sales (not profit)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resale Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Resale Profit</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${resaleRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">${resaleProfit.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              {totalRevenue > 0 ? ((resaleRevenue / totalRevenue) * 100).toFixed(1) : 0}% of total
+              From {resaleCount} resales
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Revenue Sources Pie Chart */}
+        {/* Revenue Distribution Pie Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Sources</CardTitle>
+            <CardTitle>Revenue Distribution</CardTitle>
             <CardDescription>
-              Breakdown of revenue by source
+              100% of revenue split among partners
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {revenueSourceData.length > 0 ? (
+            {distributionData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={revenueSourceData}
+                    data={distributionData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -149,7 +166,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {revenueSourceData.map((entry, index) => (
+                    {distributionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -166,7 +183,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
               </ResponsiveContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No revenue data available
+                No revenue distribution data available
               </div>
             )}
           </CardContent>
@@ -184,35 +201,57 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
-                  <div className="font-medium">Initial Sales</div>
-                  <div className="text-xs text-muted-foreground">Primary market revenue</div>
+                  <div className="font-medium">Primary Sales Volume</div>
+                  <div className="text-xs text-muted-foreground">
+                    {primarySalesCount} tickets (not profit)
+                  </div>
                 </div>
-                <div className="text-lg font-bold">${initialSalesRevenue.toFixed(2)}</div>
+                <div className="text-lg text-muted-foreground">${primarySalesVolume.toFixed(2)}</div>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
-                  <div className="font-medium">Resale Revenue</div>
-                  <div className="text-xs text-muted-foreground">Secondary market revenue</div>
+                  <div className="font-medium">Resale Volume</div>
+                  <div className="text-xs text-muted-foreground">
+                    {resaleCount} resales (full amounts)
+                  </div>
                 </div>
-                <div className="text-lg font-bold">${resaleRevenue.toFixed(2)}</div>
+                <div className="text-lg text-muted-foreground">${resaleVolume.toFixed(2)}</div>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
-                  <div className="font-medium">Platform Fees</div>
-                  <div className="text-xs text-muted-foreground">Service charges</div>
+                  <div className="font-medium">Resale Profit</div>
+                  <div className="text-xs text-muted-foreground">Profit from resales only</div>
                 </div>
-                <div className="text-lg font-bold text-destructive">-${platformFees.toFixed(2)}</div>
+                <div className="text-lg font-bold text-green-600">${resaleProfit.toFixed(2)}</div>
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t-2">
                 <div>
-                  <div className="font-bold">Net Revenue</div>
-                  <div className="text-xs text-muted-foreground">Total after fees</div>
+                  <div className="font-bold">Total Distributable Revenue (100%)</div>
+                  <div className="text-xs text-muted-foreground">Full amount from blockchain escrow</div>
                 </div>
-                <div className="text-xl font-bold text-primary">${netRevenue.toFixed(2)}</div>
+                <div className="text-xl font-bold text-primary">${totalDistributableRevenue.toFixed(2)}</div>
               </div>
+
+              <div className="flex justify-between items-center pb-2 bg-muted/50 p-3 rounded mt-4">
+                <div>
+                  <div className="font-medium">Partners Get (100%)</div>
+                  <div className="text-xs text-muted-foreground">Full revenue split by ratio {royaltyPercentage > 0 ? `(${partnerShares.map((p: any) => `${p.partyName}: ${p.percentage}%`).join(', ')})` : ''}</div>
+                </div>
+                <div className="text-lg font-bold text-primary">${totalPartnerShare.toFixed(2)}</div>
+              </div>
+
+              {royaltiesDistributed > 0 && (
+                <div className="flex justify-between items-center pb-2 bg-green-50 dark:bg-green-950 p-3 rounded">
+                  <div>
+                    <div className="font-medium">Already Distributed</div>
+                    <div className="text-xs text-muted-foreground">Paid out to partners</div>
+                  </div>
+                  <div className="text-lg font-bold text-green-600">${royaltiesDistributed.toFixed(2)}</div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -29,8 +29,8 @@ interface Ticket {
   ticketId: string;
   ownerId?: string;
   ownerWallet: string;
-  currentPrice: number;
-  originalPrice: number;
+  currentPrice: number; // USD (dollars)
+  originalPrice: number; // USD (dollars)
   forSale: boolean;
 }
 
@@ -43,6 +43,24 @@ export default function EventDetailPage() {
   const [resalePrice, setResalePrice] = useState("");
   const [resaleDialogOpen, setResaleDialogOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  
+  // Track which tickets are listed for resale (browser state for simulation)
+  const [listedForResale, setListedForResale] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`resale-listings-${eventId}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    }
+    return new Set();
+  });
+  
+  // Track custom resale prices (browser state for simulation)
+  const [resalePrices, setResalePrices] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`resale-prices-${eventId}`);
+      return stored ? JSON.parse(stored) : {};
+    }
+    return {};
+  });
 
   // Fetch event details
   const { data: event, isLoading: eventLoading, error: eventError, refetch: refetchEvent } = useQuery({
@@ -71,8 +89,9 @@ export default function EventDetailPage() {
   });
 
   console.log("blockchainTickets", blockchainTickets);
-  // Convert ticket price to cents for internal calculations
-  const ticketPriceInCents = event ? Math.round(parseFloat(event.ticketPrice) * 100) : 10000;
+  
+  // Use USD (dollars) directly - no conversion to cents
+  const ticketPriceUSD = event ? parseFloat(event.ticketPrice) : 100;
 
   // Parse blockchain tickets from API
   const blockchainTicketsArray = blockchainTickets?.tickets || [];
@@ -87,20 +106,20 @@ export default function EventDetailPage() {
     return {
       ticketId,
       ownerWallet: "ShopAdmin1234567890abcdefghijklmnopqrstuvwxyz",
-      currentPrice: ticketPriceInCents,
-      originalPrice: ticketPriceInCents,
+      currentPrice: ticketPriceUSD, // USD (dollars)
+      originalPrice: ticketPriceUSD, // USD (dollars)
       forSale: true,
     };
   }).filter(ticket => !soldTicketIds.has(ticket.ticketId)); // Only show unsold tickets
 
-  // Resale tickets - tickets that have been sold and are on blockchain
-  const resaleTickets: Ticket[] = blockchainTicketsArray.map((bt: any) => ({
+  // All blockchain tickets (purchased tickets)
+  const allBlockchainTickets: Ticket[] = blockchainTicketsArray.map((bt: any) => ({
     ticketId: bt.ticketId,
     ownerId: bt.owner,
     ownerWallet: bt.ownerWallet || getWalletAddress(), // May not be in response
-    currentPrice: bt.ticketPrice || ticketPriceInCents,
-    originalPrice: ticketPriceInCents, // Assume event's original price
-    forSale: true,
+    currentPrice: resalePrices[bt.ticketId] || bt.ticketPrice || ticketPriceUSD, // USD (dollars)
+    originalPrice: ticketPriceUSD, // Assume event's original price in USD
+    forSale: listedForResale.has(bt.ticketId), // Only for sale if explicitly listed
   }));
 
   // Purchase ticket mutation
@@ -118,8 +137,8 @@ export default function EventDetailPage() {
           ticketId: ticket.ticketId,
           buyerWallet: getWalletAddress(),
           sellerWallet: ticket.ownerWallet,
-          newPrice: ticket.currentPrice,
-          originalPrice: ticket.originalPrice,
+          newPrice: ticket.currentPrice, // USD (dollars)
+          originalPrice: ticket.originalPrice, // USD (dollars)
           buyerId: getUserId(),
           sellerId: ticket.ownerId || "unknown",
         },
@@ -146,17 +165,36 @@ export default function EventDetailPage() {
 
   const handleResell = (ticket: Ticket) => {
     setSelectedTicket(ticket);
-    setResalePrice(((ticket.currentPrice / 100) * 1.2).toFixed(2)); // 20% markup
+    setResalePrice((ticket.currentPrice * 1.2).toFixed(2)); // 20% markup in USD
     setResaleDialogOpen(true);
   };
 
   const handleConfirmResale = () => {
     if (!selectedTicket) return;
     
-    const newPriceInCents = Math.round(parseFloat(resalePrice) * 100);
+    const newPriceUSD = parseFloat(resalePrice);
     
-    // Here we would call the resale API
-    alert(`Reselling ticket for $${resalePrice} (API integration needed for resale listing)`);
+    if (isNaN(newPriceUSD) || newPriceUSD <= 0) {
+      alert("Please enter a valid price");
+      return;
+    }
+    
+    // Add ticket to resale listings
+    const newListings = new Set(listedForResale);
+    newListings.add(selectedTicket.ticketId);
+    setListedForResale(newListings);
+    
+    // Store custom resale price
+    const newPrices = { ...resalePrices, [selectedTicket.ticketId]: newPriceUSD };
+    setResalePrices(newPrices);
+    
+    // Persist to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`resale-listings-${eventId}`, JSON.stringify([...newListings]));
+      localStorage.setItem(`resale-prices-${eventId}`, JSON.stringify(newPrices));
+    }
+    
+    alert(`Ticket listed for resale at $${resalePrice}`);
     setResaleDialogOpen(false);
   };
 
@@ -225,11 +263,13 @@ export default function EventDetailPage() {
     );
   }
 
-  // My owned tickets (from blockchain)
-  const myTickets = resaleTickets.filter((t) => t.ownerId === getUserId());
+  // My owned tickets (from blockchain) - not listed for resale
+  const myTickets = allBlockchainTickets.filter((t) => t.ownerId === getUserId());
   
-  // Resale market (owned by others)
-  const resaleMarketTickets = resaleTickets.filter((t) => t.ownerId !== getUserId());
+  // Resale market - tickets explicitly listed for resale by other users
+  const resaleMarketTickets = allBlockchainTickets.filter((t) => 
+    t.ownerId !== getUserId() && listedForResale.has(t.ticketId)
+  );
   
   // Primary sale tickets (only show if blockchain is enabled)
   const availablePrimaryTickets = event?.blockchainEnabled ? primarySaleTickets : [];
@@ -328,16 +368,32 @@ export default function EventDetailPage() {
                       <div className="space-y-2 mb-4">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Purchase Price:</span>
-                          <span className="font-medium">${(ticket.currentPrice / 100).toFixed(2)}</span>
+                          <span className="font-medium">${ticket.currentPrice.toFixed(2)}</span>
                         </div>
+                        {listedForResale.has(ticket.ticketId) && (
+                          <div className="flex justify-between text-sm">
+                            <Badge variant="secondary" className="text-xs">Listed for Resale</Badge>
+                            <span className="font-bold text-green-600">${resalePrices[ticket.ticketId]?.toFixed(2)}</span>
+                          </div>
+                        )}
                       </div>
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={() => handleResell(ticket)}
-                      >
-                        Resell Ticket
-                      </Button>
+                      {!listedForResale.has(ticket.ticketId) ? (
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={() => handleResell(ticket)}
+                        >
+                          List for Resale
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          variant="secondary"
+                          disabled
+                        >
+                          ✓ Listed for Resale
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -367,7 +423,7 @@ export default function EventDetailPage() {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Price:</span>
                             <span className="font-bold text-lg">
-                              ${(ticket.currentPrice / 100).toFixed(2)}
+                              ${ticket.currentPrice.toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -410,16 +466,16 @@ export default function EventDetailPage() {
                       <CardContent>
                         <div className="space-y-2 mb-4">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Price:</span>
+                            <span className="text-muted-foreground">Resale Price:</span>
                             <span className="font-bold text-lg">
-                              ${(ticket.currentPrice / 100).toFixed(2)}
+                              ${ticket.currentPrice.toFixed(2)}
                             </span>
                           </div>
                           {ticket.currentPrice !== ticket.originalPrice && (
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Original:</span>
                               <span className="line-through">
-                                ${(ticket.originalPrice / 100).toFixed(2)}
+                                ${ticket.originalPrice.toFixed(2)}
                               </span>
                             </div>
                           )}
@@ -480,7 +536,7 @@ export default function EventDetailPage() {
                     placeholder="120.00"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Original price: ${((selectedTicket?.originalPrice || 0) / 100).toFixed(2)}
+                    Original price: ${(selectedTicket?.originalPrice || 0).toFixed(2)}
                   </p>
                 </div>
               </div>
