@@ -75,7 +75,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
   // Prepare data for revenue source pie chart (showing profit breakdown)
   const revenueSourceData = [
     { name: "Resale Profit", value: resaleProfit, color: "hsl(var(--chart-2))" },
-  ].filter(item => item.value > 0);
+  ].filter((item: { name: string; value: number; color: string }) => item.value > 0);
 
   // If there are partner shares, show distribution breakdown (partners only - 100% split)
   const distributionData = partnerShares.length > 0 
@@ -83,7 +83,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
         name: `${p.partyName || `Partner ${i + 1}`} (${p.percentage}%)`,
         value: p.estimatedShare,
         color: `hsl(var(--chart-${(i % 5) + 1}))`,
-      })).filter(item => item.value > 0)
+      })).filter((item: { name: string; value: number; color: string }) => item.value > 0)
     : [];
 
   return (
@@ -166,7 +166,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {distributionData.map((entry, index) => (
+                    {distributionData.map((entry: { name: string; value: number; color: string }, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>

@@ -237,6 +237,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{id}/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all ticket transactions for an event
+         * @description Returns all ticket purchase and resale transactions with full history.
+         */
+        get: operations["EventsController_getEventTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/tickets": {
         parameters: {
             query?: never;
@@ -469,7 +489,7 @@ export interface components {
              */
             totalTickets: number;
             /**
-             * @description Ticket price in smallest currency unit
+             * @description Ticket price in USD (e.g., 100.00)
              * @example 100
              */
             ticketPrice: number;
@@ -1221,6 +1241,34 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Ticket distribution analytics retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EventsController_getEventTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event business ID (e.g., concert-001) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transactions retrieved successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
