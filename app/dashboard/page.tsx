@@ -11,7 +11,7 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
-  
+
   // Use userId from the user object
   const userId = (user as any)?.userId || user?.id;
 
@@ -38,7 +38,7 @@ export default function DashboardPage() {
 
   const events = (eventsData as any)?.data || [];
   const totalEvents = events.length;
-  const activeEvents = events.filter((e: any) => 
+  const activeEvents = events.filter((e: any) =>
     new Date(e.eventDate) > new Date()
   ).length;
 
@@ -47,9 +47,9 @@ export default function DashboardPage() {
     (sum: number, event: any) => sum + (event.ticketsSold || 0),
     0
   );
-  
+
   const totalRevenue = events.reduce(
-    (sum: number, event: any) => 
+    (sum: number, event: any) =>
       sum + ((event.ticketsSold || 0) * (event.ticketPrice || 0)),
     0
   );
@@ -107,6 +107,11 @@ export default function DashboardPage() {
         <Link href="/dashboard/events">
           <Button size="lg" variant="outline">
             View All Events
+          </Button>
+        </Link>
+        <Link href="/integrations/ticketmaster">
+          <Button size="lg" variant="outline" className="gap-2 border-[#026CDF] text-[#026CDF] hover:bg-[#026CDF] hover:text-white">
+            🎟️ Ticketmaster Integration
           </Button>
         </Link>
       </div>
