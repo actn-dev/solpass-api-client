@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { EnableRoyaltiesDialog } from "@/components/enable-royalties-dialog";
 
 interface TMEvent {
     id: string;
@@ -26,8 +28,33 @@ interface TMEvent {
 export default function TicketmasterEventsPage() {
     const [keyword, setKeyword] = useState("concert");
     const [search, setSearch] = useState("concert");
+    const [enabled, setEnabled] = useState<Record<string, string>>({});
+    const [dialogEvent, setDialogEvent] = useState<TMEvent | null>(null);
 
-    const { data, isLoading, error, refetch } = useQuery({
+    // Fetch already-registered Solpass events to restore enabled state on reload
+    const { data: solpassData } = useQuery({
+        queryKey: ["solpass-events-tm"],
+        queryFn: async () => {
+            const res = await apiClient.GET("/api/v1/events", { params: { query: { limit: 100, partnerId: "c61129bf-a6d4-47aa-80b8-67e9cb672adf" } } });
+            return (res.data as any)?.data ?? [];
+        },
+    });
+
+    // Map tmId (first 16 chars) → solpass UUID from DB
+    const enabledFromDB = useMemo<Record<string, string>>(() => {
+        if (!solpassData) return {};
+        const map: Record<string, string> = {};
+        for (const e of solpassData) {
+            // tmEvent.id.slice(0,16) was used as eventId when registering
+            map[e.eventId] = e.id;
+        }
+        return map;
+    }, [solpassData]);
+
+    // Resolve: local session takes priority, fall back to DB
+    const getEnabledId = (tmId: string) => enabled[tmId] ?? enabledFromDB[tmId.slice(0, 16)];
+
+    const { data, isLoading, error } = useQuery({
         queryKey: ["tm-events", search],
         queryFn: async () => {
             const res = await fetch(`/api/ticketmaster/events?keyword=${encodeURIComponent(search)}&size=12`);
@@ -102,53 +129,77 @@ export default function TicketmasterEventsPage() {
                             Showing {events.length} of {data?.total?.toLocaleString()} results
                         </p>
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {events.map((event) => (
-                                <Card key={event.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                                    {event.image && (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={event.image}
-                                            alt={event.name}
-                                            className="w-full h-40 object-cover"
-                                        />
-                                    )}
-                                    <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-start gap-2">
-                                            <CardTitle className="text-base leading-tight">{event.name}</CardTitle>
-                                            {event.genre && (
-                                                <Badge variant="outline" className="text-xs shrink-0">{event.genre}</Badge>
+                            {events.map((event) => {
+                                const solpassId = getEnabledId(event.id);
+
+                                return (
+                                    <Card key={event.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                                        {event.image && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={event.image}
+                                                alt={event.name}
+                                                className="w-full h-40 object-cover"
+                                            />
+                                        )}
+                                        <CardHeader className="pb-2">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <CardTitle className="text-base leading-tight">{event.name}</CardTitle>
+                                                {event.genre && (
+                                                    <Badge variant="outline" className="text-xs shrink-0">{event.genre}</Badge>
+                                                )}
+                                            </div>
+                                            <CardDescription className="text-xs">
+                                                {event.venue}{event.city ? `, ${event.city}` : ""}
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="pt-0">
+                                            <div className="space-y-1 text-sm mb-3">
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Date:</span>
+                                                    <span>{event.date ?? "TBA"}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Price:</span>
+                                                    <span>
+                                                        {event.minPrice != null
+                                                            ? `$${event.minPrice}${event.maxPrice && event.maxPrice !== event.minPrice ? ` – $${event.maxPrice}` : ""}`
+                                                            : "See site"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {solpassId ? (
+                                                <div className="space-y-2">
+                                                    <Badge className="w-full justify-center bg-green-600 hover:bg-green-600 text-white py-1">
+                                                        ✓ Solpass Royalties Active
+                                                    </Badge>
+                                                    <Link href={`/integrations/ticketmaster/${event.id.slice(0, 16)}?tmId=${event.id}`}>
+                                                        <Button size="sm" variant="outline" className="w-full">View Event Details →</Button>
+                                                    </Link>
+                                                </div>
+                                            ) : (
+                                                <Button size="sm" className="w-full" onClick={() => setDialogEvent(event)}>
+                                                    Enable Solpass Royalties
+                                                </Button>
                                             )}
-                                        </div>
-                                        <CardDescription className="text-xs">
-                                            {event.venue}{event.city ? `, ${event.city}` : ""}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        <div className="space-y-1 text-sm mb-3">
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Date:</span>
-                                                <span>{event.date ?? "TBA"}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Price:</span>
-                                                <span>
-                                                    {event.minPrice != null
-                                                        ? `$${event.minPrice}${event.maxPrice && event.maxPrice !== event.minPrice ? ` – $${event.maxPrice}` : ""}`
-                                                        : "See site"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {/* Next step placeholder — will wire up in resale step */}
-                                        <Button size="sm" className="w-full" disabled>
-                                            Enable Solpass Royalties
-                                        </Button>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </div>
                     </>
                 )}
             </div>
+
+            <EnableRoyaltiesDialog
+                tmEvent={dialogEvent}
+                open={!!dialogEvent}
+                onOpenChange={(v) => !v && setDialogEvent(null)}
+                onSuccess={(solpassId) => {
+                    if (dialogEvent) setEnabled((prev) => ({ ...prev, [dialogEvent.id]: solpassId }));
+                    setDialogEvent(null);
+                }}
+            />
         </div>
     );
 }

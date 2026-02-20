@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function EventsPage() {
   const { user } = useAuth();
+  console.log("EventsPage - User state:", user);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch events for this partner
