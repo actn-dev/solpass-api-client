@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { TicketOffer, TicketType } from "@/app/api/ticketmaster/events/[id]/offers/route";
 
 export default function TMEventDetailPage() {
     return (
@@ -43,6 +44,24 @@ function TMEventDetail() {
             if (res.error) throw new Error("Failed to fetch Solpass event");
             return res.data as any;
         },
+    });
+
+    // Fetch offers / inventory (mock Partner API)
+    const [offerFilter, setOfferFilter] = useState<TicketType | "ALL">("ALL");
+    const { data: offersData, isLoading: offersLoading } = useQuery({
+        queryKey: ["tm-offers", tmId, tmEvent?.minPrice, tmEvent?.maxPrice],
+        queryFn: async () => {
+            if (!tmId) return null;
+            const params = new URLSearchParams({
+                minPrice: String(tmEvent?.minPrice ?? 50),
+                maxPrice: String(tmEvent?.maxPrice ?? 150),
+                currency: tmEvent?.currency ?? "USD",
+            });
+            const res = await fetch(`/api/ticketmaster/events/${tmId}/offers?${params}`);
+            if (!res.ok) throw new Error("Failed to fetch offers");
+            return res.json() as Promise<{ eventId: string; currency: string; source: string; offers: TicketOffer[] }>;
+        },
+        enabled: !!tmId && !!tmEvent,
     });
 
     // Fetch escrow balance
@@ -92,6 +111,15 @@ function TMEventDetail() {
                             <p className="text-muted-foreground text-sm mt-1">
                                 {tmEvent?.venue}{tmEvent?.city ? `, ${tmEvent.city}` : ""}
                             </p>
+                            {tmEvent?.minPrice != null && (
+                                <p className="mt-2 text-lg font-semibold text-green-600">
+                                    🎟 From ${tmEvent.minPrice}
+                                    {tmEvent.maxPrice && tmEvent.maxPrice !== tmEvent.minPrice
+                                        ? ` – $${tmEvent.maxPrice}`
+                                        : ""}{" "}
+                                    <span className="text-sm font-normal text-muted-foreground">{tmEvent.currency}</span>
+                                </p>
+                            )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
                             {tmEvent?.genre && <Badge variant="outline">{tmEvent.genre}</Badge>}
@@ -185,6 +213,49 @@ function TMEventDetail() {
                             </CardContent>
                         </Card>
                     )}
+
+                    {/* Tickets & Seats */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div>
+                                <h2 className="text-lg font-semibold">Tickets &amp; Seats</h2>
+                                <p className="text-xs text-muted-foreground">
+                                    {offersData?.source === "MOCK" ? "Simulated inventory — shaped like TM Partner Offers API" : "Live inventory"}
+                                </p>
+                            </div>
+                            {/* Type filter pills */}
+                            <div className="flex gap-2 flex-wrap">
+                                {(["ALL", "STANDARD", "VIP", "ACCESSIBLE", "RESALE"] as const).map((t) => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setOfferFilter(t)}
+                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${offerFilter === t
+                                                ? "bg-foreground text-background border-foreground"
+                                                : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                                            }`}
+                                    >
+                                        {t === "ALL" ? "All" : t.charAt(0) + t.slice(1).toLowerCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {offersLoading && (
+                            <div className="flex justify-center py-12">
+                                <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+                            </div>
+                        )}
+
+                        {!offersLoading && offersData && (
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {offersData.offers
+                                    .filter((o) => offerFilter === "ALL" || o.type === offerFilter)
+                                    .map((offer) => (
+                                        <TicketCard key={offer.offerId} offer={offer} tmUrl={tmEvent?.url} />
+                                    ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
@@ -197,6 +268,88 @@ function Row({ label, value, mono }: { label: string; value: any; mono?: boolean
         <div className="flex justify-between gap-2">
             <span className="text-muted-foreground shrink-0">{label}:</span>
             <span className={`text-right ${mono ? "font-mono text-xs break-all" : ""}`}>{String(value)}</span>
+        </div>
+    );
+}
+
+const TYPE_STYLES: Record<TicketType, { badge: string; border: string }> = {
+    STANDARD: { badge: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", border: "border-blue-200 dark:border-blue-800" },
+    VIP: { badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", border: "border-yellow-300 dark:border-yellow-700" },
+    ACCESSIBLE: { badge: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200", border: "border-purple-200 dark:border-purple-800" },
+    RESALE: { badge: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", border: "border-orange-200 dark:border-orange-800" },
+};
+
+const TYPE_LABELS: Record<TicketType, string> = {
+    STANDARD: "Standard",
+    VIP: "⭐ VIP",
+    ACCESSIBLE: "♿ Accessible",
+    RESALE: "🔄 Resale",
+};
+
+function availabilityLabel(available: number, total: number): { text: string; color: string } {
+    const pct = available / total;
+    if (available <= 5) return { text: `Only ${available} left!`, color: "text-red-600" };
+    if (pct < 0.15) return { text: `${available} remaining`, color: "text-orange-500" };
+    if (pct < 0.40) return { text: `${available} available`, color: "text-yellow-600" };
+    return { text: `${available} available`, color: "text-green-600" };
+}
+
+function TicketCard({ offer, tmUrl }: { offer: TicketOffer; tmUrl?: string }) {
+    const styles = TYPE_STYLES[offer.type];
+    const avail = availabilityLabel(offer.available, offer.totalCapacity);
+
+    return (
+        <div className={`rounded-xl border-2 ${styles.border} bg-card p-4 flex flex-col gap-3`}>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2">
+                <div>
+                    <p className="font-semibold text-sm leading-tight">{offer.section}</p>
+                    {offer.row && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Row {offer.row}</p>
+                    )}
+                </div>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles.badge} whitespace-nowrap`}>
+                    {TYPE_LABELS[offer.type]}
+                </span>
+            </div>
+
+            {/* Description */}
+            <p className="text-xs text-muted-foreground leading-snug">{offer.description}</p>
+
+            {/* Price + availability */}
+            <div className="flex items-end justify-between">
+                <div>
+                    <span className="text-xl font-bold">${offer.price.toFixed(2)}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{offer.currency}</span>
+                </div>
+                <span className={`text-xs font-medium ${avail.color}`}>{avail.text}</span>
+            </div>
+
+            {/* Delivery methods */}
+            <div className="flex gap-1 flex-wrap">
+                {offer.deliveryMethods.map((d) => (
+                    <span key={d} className="text-[10px] border rounded px-1.5 py-0.5 text-muted-foreground">
+                        {d.replace(/_/g, " ")}
+                    </span>
+                ))}
+            </div>
+
+            {/* Restrictions */}
+            {offer.restrictions && (
+                <p className="text-[10px] text-muted-foreground italic">{offer.restrictions}</p>
+            )}
+
+            {/* CTA */}
+            <a
+                href={tmUrl ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-auto"
+            >
+                <Button size="sm" className="w-full text-xs" variant={offer.type === "VIP" ? "default" : "outline"}>
+                    {offer.type === "RESALE" ? "View Resale Listing ↗" : "Select Seats ↗"}
+                </Button>
+            </a>
         </div>
     );
 }
