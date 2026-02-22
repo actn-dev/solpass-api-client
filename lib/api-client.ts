@@ -17,7 +17,7 @@ function createAuthenticatedClient() {
       
       // Determine which auth to use based on the current page
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const isPlatformSimulation = currentPath.startsWith('/events');
+      const isPlatformSimulation = currentPath.startsWith('/events') || currentPath.startsWith('/integrations');
       
       if (isPlatformSimulation && apiKey) {
         // Platform simulation pages use API key

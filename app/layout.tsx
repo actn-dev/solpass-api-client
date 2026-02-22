@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/lib/hooks/use-auth";
 import { ModeProvider } from "@/lib/hooks/use-mode";
+import { PlatformProvider } from "@/lib/hooks/use-platform";
 import { Toaster } from "sonner";
 
 const geistSans = Geist({
@@ -33,10 +34,12 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ModeProvider>
-            <QueryProvider>
-              {children}
-              <Toaster position="top-right" />
-            </QueryProvider>
+            <PlatformProvider>
+              <QueryProvider>
+                {children}
+                <Toaster position="top-right" />
+              </QueryProvider>
+            </PlatformProvider>
           </ModeProvider>
         </AuthProvider>
       </body>
