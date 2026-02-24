@@ -11,7 +11,12 @@ import { Label } from "@/components/ui/label";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Clock, AlertCircle, Wallet, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Wallet, ShieldCheck, ExternalLink } from "lucide-react";
+
+// ─── Solscan devnet helpers ───────────────────────────────────────────────────
+const SOLSCAN_PROGRAM_URL = "https://solscan.io/account/648QAyrE8SnXFfQTUTyiqav9SZofNxi8LKfDB8WtskU?cluster=devnet";
+const solscanUrl = (address: string) =>
+    `https://solscan.io/account/${address}?cluster=devnet`;
 
 // ─── Known demo wallet → base58 private key map ──────────────────────────────
 // TM    wallet: CD8bTqYcRvEvG1y73S5yZMP4PmXkqiMaP9NYvx6vxGbo
@@ -190,9 +195,20 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
         return (
             <Card className="border-green-500/30">
                 <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <CardTitle className="text-green-600">Royalties Distributed</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <CardTitle className="text-green-600">Royalties Distributed</CardTitle>
+                        </div>
+                        <a
+                            href={SOLSCAN_PROGRAM_URL}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <ExternalLink className="h-3 w-3" />
+                            View Program
+                        </a>
                     </div>
                     <CardDescription>
                         All funds have been sent to party wallets. No further action required.
@@ -204,8 +220,21 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
                             <div key={p.walletAddress} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
                                 <div className="flex items-center gap-2">
                                     <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                                    <span className="font-medium">{p.partyName}</span>
-                                    <span className="text-muted-foreground font-mono text-xs">{p.walletAddress.slice(0, 8)}…</span>
+                                    <div>
+                                        <span className="font-medium">{p.partyName}</span>
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <span className="text-muted-foreground font-mono text-xs">{p.walletAddress.slice(0, 8)}…{p.walletAddress.slice(-6)}</span>
+                                            <a
+                                                href={solscanUrl(p.walletAddress)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-blue-500 hover:text-blue-600 transition-colors"
+                                                title="View on Solscan"
+                                            >
+                                                <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <span className="font-semibold text-green-600">
                                     ${((status.escrowBalance * p.percentage) / 100).toFixed(4)}
@@ -238,9 +267,20 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
                                 <ShieldCheck className="h-5 w-5 text-primary" />
                                 <CardTitle>Multi-Sig Approval</CardTitle>
                             </div>
-                            <Badge variant={status.canDistribute ? "default" : "secondary"}>
-                                {status.approvedCount} / {status.threshold} approvals
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={SOLSCAN_PROGRAM_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    <ExternalLink className="h-3 w-3" />
+                                    View Program
+                                </a>
+                                <Badge variant={status.canDistribute ? "default" : "secondary"}>
+                                    {status.approvedCount} / {status.threshold} approvals
+                                </Badge>
+                            </div>
                         </div>
                         <CardDescription>
                             {status.canDistribute
@@ -299,6 +339,15 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
                                             <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono mt-0.5">
                                                 <Wallet className="h-3 w-3" />
                                                 {party.walletAddress.slice(0, 12)}…{party.walletAddress.slice(-6)}
+                                                <a
+                                                    href={solscanUrl(party.walletAddress)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-blue-500 hover:text-blue-600 transition-colors ml-0.5"
+                                                    title="View on Solscan"
+                                                >
+                                                    <ExternalLink className="h-3 w-3" />
+                                                </a>
                                             </div>
                                         </div>
                                     </div>

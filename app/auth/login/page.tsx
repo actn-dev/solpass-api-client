@@ -76,12 +76,12 @@ export default function LoginPage() {
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-4">
+        <CardFooter className="flex flex-col gap-4 mt-3">
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Signing in..." : "Sign In"}
           </Button>
 
-          <p className="text-sm text-center text-muted-foreground">
+          {/* <p className="text-sm text-center text-muted-foreground">
             Don't have an account?{" "}
             <Link
               href="/auth/signup"
@@ -89,7 +89,7 @@ export default function LoginPage() {
             >
               Sign up
             </Link>
-          </p>
+          </p> */}
         </CardFooter>
       </form>
     </Card>
