@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useMode } from "@/lib/hooks/use-mode";
@@ -25,6 +25,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import type { TicketOffer, TicketType } from "@/app/api/ticketmaster/events/[id]/offers/route";
+import { EnableRoyaltiesDialog } from "@/components/enable-royalties-dialog";
 
 export default function TMEventDetailPage() {
     return (
@@ -39,6 +40,8 @@ function TMEventDetail() {
     const searchParams = useSearchParams();
     const tmId = searchParams.get("tmId");
 
+    const queryClient = useQueryClient();
+
     const { mode, getUserId, getWalletAddress } = useMode();
     const userId = getUserId();
     const { isConfigured, setApiKey } = usePlatform();
@@ -52,6 +55,9 @@ function TMEventDetail() {
             .then((key) => { setApiKey(key); setConfigError(false); })
             .catch(() => setConfigError(true));
     }, [isAuthenticated, isConfigured]);
+
+    // ── Chain gate state ──────────────────────────────────────────────────────
+    const [enableDialogOpen, setEnableDialogOpen] = useState(false);
 
     // ── Buy error banner ─────────────────────────────────────────────────────
     const [buyError, setBuyError] = useState<string | null>(null);
@@ -112,6 +118,17 @@ function TMEventDetail() {
             return (res.data as any) ?? null;
         },
         enabled: !!spEvent?.blockchainEnabled,
+    });
+
+    const { data: approvalStatus } = useQuery({
+        queryKey: ["approval-status", spEvent?.eventId],
+        queryFn: async () => {
+            const res = await fetch(`/api/solpass/approval-status?eventId=${spEvent!.eventId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Failed to fetch approval status");
+            return data;
+        },
+        enabled: !!spEvent?.blockchainEnabled && !!spEvent?.eventId,
     });
 
     // ── Ticket simulation (localStorage) ────────────────────────────────────
@@ -192,14 +209,14 @@ function TMEventDetail() {
 
     // ── Handlers ─────────────────────────────────────────────────────────────
     const handleBuyPrimary = (offer: TicketOffer) => {
-        if (mode === "admin") return;
+        if (tradingLocked) return;
         setBuyError(null);
         setPendingOfferId(offer.offerId);
         primaryMutation.mutate(offer, { onSettled: () => setPendingOfferId(null) });
     };
 
     const handleBuyResale = (ticket: TmPurchasedTicket) => {
-        if (mode === "admin") return;
+        if (tradingLocked) return;
         setBuyError(null);
         setPendingResaleId(ticket.ticketId);
         resaleMutation.mutate(ticket, { onSettled: () => setPendingResaleId(null) });
@@ -221,6 +238,37 @@ function TMEventDetail() {
 
     const isLoading = tmLoading || spLoading;
     const currency = offersData?.currency ?? tmEvent?.currency ?? "USD";
+
+    // ── Chain-readiness gate ──────────────────────────────────────────────────
+    // true only once the event is on-chain (blockchainEnabled) AND the USDC
+    // partner accounts have been set up (escrow is returned by the API).
+    const chainReady = !!spEvent?.blockchainEnabled;
+
+    // true when royalties have already been distributed on-chain
+    const royaltiesDistributed = !!approvalStatus?.royaltyDistributed;
+
+    // buying/reselling is locked when admin OR royalties already paid out
+    const tradingLocked = mode === "admin" || royaltiesDistributed;
+
+    // Auto-open the enable dialog when the event is loaded but not yet on-chain
+    useEffect(() => {
+        if (!isLoading && spEvent && !spEvent.blockchainEnabled) {
+            setEnableDialogOpen(true);
+        }
+    }, [isLoading, spEvent]);
+
+    // Shape the tmEvent into what EnableRoyaltiesDialog expects
+    const dialogTmEvent = tmEvent
+        ? {
+            id: tmId ?? (tmEvent as any).id ?? "",
+            name: tmEvent.name ?? "",
+            venue: tmEvent.venue ?? "",
+            city: tmEvent.city ?? "",
+            date: tmEvent.date ?? null,
+            minPrice: tmEvent.minPrice ?? null,
+            genre: tmEvent.genre ?? null,
+        }
+        : null;
 
     // Adjust available count per offer by subtracting local purchases
     const adjustedOffers = (offersData?.offers ?? []).map((o) => ({
@@ -386,92 +434,122 @@ function TMEventDetail() {
                         </Card>
                     )}
 
-                    {/* ── MY TICKETS ─────────────────────────────────────────────── */}
-                    {myTickets.length > 0 && (
-                        <div>
-                            <h2 className="text-lg font-semibold mb-3">🎫 My Tickets</h2>
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {myTickets.map((ticket) => (
-                                    <MyTicketCard
-                                        key={ticket.ticketId}
-                                        ticket={ticket}
-                                        onResell={() => openResaleDialog(ticket)}
-                                        onCancelResale={() => cancelResale(ticket.ticketId)}
-                                    />
-                                ))}
-                            </div>
+                    {/* ── CHAIN GATE ─────────────────────────────────────────────── */}
+                    {!chainReady ? (
+                        <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-10 text-center space-y-4">
+                            <div className="text-5xl">⛓</div>
+                            <h3 className="text-lg font-semibold">Blockchain not initialized</h3>
+                            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                                This event has not been enabled on-chain yet. Ticket purchases and resales
+                                require Solpass royalty enforcement to be active.
+                            </p>
+                            <Button onClick={() => setEnableDialogOpen(true)}>
+                                Enable Solpass on this Event
+                            </Button>
                         </div>
-                    )}
+                    ) : (
+                        <>
+                            {/* ── ROYALTIES DISTRIBUTED BANNER ──────────────────────────── */}
+                            {royaltiesDistributed && (
+                                <Alert className="border-green-500/40 bg-green-500/5">
+                                    <AlertDescription className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                        <span className="text-lg">✅</span>
+                                        <span>
+                                            Royalties have been distributed on-chain for this event.
+                                            Ticket purchases and resales are no longer available.
+                                        </span>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
 
-                    {/* ── RESALE MARKET ──────────────────────────────────────────── */}
-                    {resaleMarket.length > 0 && (
-                        <div>
-                            <h2 className="text-lg font-semibold mb-1">🔄 Resale Market</h2>
-                            <p className="text-xs text-muted-foreground mb-3">Tickets listed for resale by other fans</p>
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {resaleMarket.map((ticket) => (
-                                    <ResaleCard
-                                        key={ticket.ticketId}
-                                        ticket={ticket}
-                                        isAdmin={mode === "admin"}
-                                        isPending={pendingResaleId === ticket.ticketId}
-                                        onBuy={() => handleBuyResale(ticket)}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                            {/* ── MY TICKETS ─────────────────────────────────────────────── */}
+                            {myTickets.length > 0 && (
+                                <div>
+                                    <h2 className="text-lg font-semibold mb-3">🎫 My Tickets</h2>
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {myTickets.map((ticket) => (
+                                            <MyTicketCard
+                                                key={ticket.ticketId}
+                                                ticket={ticket}
+                                                onResell={() => openResaleDialog(ticket)}
+                                                onCancelResale={() => cancelResale(ticket.ticketId)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                    {/* ── PRIMARY INVENTORY ──────────────────────────────────────── */}
-                    <div>
-                        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            {/* ── RESALE MARKET ──────────────────────────────────────────── */}
+                            {resaleMarket.length > 0 && (
+                                <div>
+                                    <h2 className="text-lg font-semibold mb-1">🔄 Resale Market</h2>
+                                    <p className="text-xs text-muted-foreground mb-3">Tickets listed for resale by other fans</p>
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {resaleMarket.map((ticket) => (
+                                            <ResaleCard
+                                                key={ticket.ticketId}
+                                                ticket={ticket}
+                                                isAdmin={tradingLocked}
+                                                isPending={pendingResaleId === ticket.ticketId}
+                                                onBuy={() => handleBuyResale(ticket)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── PRIMARY INVENTORY ──────────────────────────────────────── */}
                             <div>
-                                <h2 className="text-lg font-semibold">🎟 Tickets &amp; Seats</h2>
-                                <p className="text-xs text-muted-foreground">
-                                    {offersData?.source === "MOCK"
-                                        ? "Simulated inventory — shaped like TM Partner Offers API"
-                                        : "Live inventory"}
-                                </p>
-                            </div>
-                            <div className="flex gap-2 flex-wrap">
-                                {(["ALL", "STANDARD", "VIP", "ACCESSIBLE", "RESALE"] as const).map((t) => (
-                                    <button
-                                        key={t}
-                                        onClick={() => setOfferFilter(t)}
-                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${offerFilter === t
-                                            ? "bg-foreground text-background border-foreground"
-                                            : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                                            }`}
-                                    >
-                                        {t === "ALL" ? "All" : t.charAt(0) + t.slice(1).toLowerCase()}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                                    <div>
+                                        <h2 className="text-lg font-semibold">🎟 Tickets &amp; Seats</h2>
+                                        <p className="text-xs text-muted-foreground">
+                                            {offersData?.source === "MOCK"
+                                                ? "Simulated inventory — shaped like TM Partner Offers API"
+                                                : "Live inventory"}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {(["ALL", "STANDARD", "VIP", "ACCESSIBLE", "RESALE"] as const).map((t) => (
+                                            <button
+                                                key={t}
+                                                onClick={() => setOfferFilter(t)}
+                                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${offerFilter === t
+                                                    ? "bg-foreground text-background border-foreground"
+                                                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                                                    }`}
+                                            >
+                                                {t === "ALL" ? "All" : t.charAt(0) + t.slice(1).toLowerCase()}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
 
-                        {offersLoading && (
-                            <div className="flex justify-center py-12">
-                                <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
-                            </div>
-                        )}
+                                {offersLoading && (
+                                    <div className="flex justify-center py-12">
+                                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+                                    </div>
+                                )}
 
-                        {!offersLoading && offersData && (
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {adjustedOffers
-                                    .filter((o) => offerFilter === "ALL" || o.type === offerFilter)
-                                    .map((offer) => (
-                                        <TicketCard
-                                            key={offer.offerId}
-                                            offer={offer}
-                                            currency={currency}
-                                            isAdmin={mode === "admin"}
-                                            isPending={pendingOfferId === offer.offerId}
-                                            onBuy={() => handleBuyPrimary(offer)}
-                                        />
-                                    ))}
+                                {!offersLoading && offersData && (
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {adjustedOffers
+                                            .filter((o) => offerFilter === "ALL" || o.type === offerFilter)
+                                            .map((offer) => (
+                                                <TicketCard
+                                                    key={offer.offerId}
+                                                    offer={offer}
+                                                    currency={currency}
+                                                    isAdmin={tradingLocked}
+                                                    isPending={pendingOfferId === offer.offerId}
+                                                    onBuy={() => handleBuyPrimary(offer)}
+                                                />
+                                            ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -479,6 +557,17 @@ function TMEventDetail() {
             <div className="fixed bottom-4 right-4 z-50">
                 <UserAvatarSwitcher />
             </div>
+
+            {/* ── ENABLE SOLPASS DIALOG ─────────────────────────────────────── */}
+            <EnableRoyaltiesDialog
+                tmEvent={dialogTmEvent}
+                open={enableDialogOpen}
+                onOpenChange={setEnableDialogOpen}
+                onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ["sp-event", eventId] });
+                    setEnableDialogOpen(false);
+                }}
+            />
 
             {/* ── RESALE DIALOG ──────────────────────────────────────────────── */}
             <Dialog open={resaleDialogOpen} onOpenChange={setResaleDialogOpen}>
