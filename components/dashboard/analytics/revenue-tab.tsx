@@ -1,10 +1,10 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { useQuery } from "@tanstack/react-query";
 import { DollarSign, TrendingUp, Wallet } from "lucide-react";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 interface RevenueTabProps {
   eventId: string;
@@ -44,7 +44,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
   }
 
   const data = revenueData as any;
-  
+
   const {
     revenue = {},
     transactions = {},
@@ -56,7 +56,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
 
   // ✅ Main revenue from escrow (distributable)
   const totalDistributableRevenue = revenue.totalDistributableRevenue || revenue.escrowBalance || 0;
-  
+
   // Breakdown from DB (for display only, not actual revenue)
   const primarySalesVolume = revenue.primarySalesVolume || 0;
   const primarySalesCount = revenue.primarySalesCount || 0;
@@ -67,7 +67,7 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
   // Partner share calculation (show first partner for now, or sum all)
   const totalPartnerShare = partnerShares.reduce((sum: number, p: any) => sum + (p.estimatedShare || 0), 0);
   const royaltyPercentage = royalties.royaltyPercentage || 0;
-  
+
   // Distribution info
   const pendingDistribution = royalties.pendingDistribution || totalDistributableRevenue;
   const royaltiesDistributed = royalties.royaltiesDistributed || 0;
@@ -78,12 +78,12 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
   ].filter((item: { name: string; value: number; color: string }) => item.value > 0);
 
   // If there are partner shares, show distribution breakdown (partners only - 100% split)
-  const distributionData = partnerShares.length > 0 
+  const distributionData = partnerShares.length > 0
     ? partnerShares.map((p: any, i: number) => ({
-        name: `${p.partyName || `Partner ${i + 1}`} (${p.percentage}%)`,
-        value: p.estimatedShare,
-        color: `hsl(var(--chart-${(i % 5) + 1}))`,
-      })).filter((item: { name: string; value: number; color: string }) => item.value > 0)
+      name: `${p.partyName || `Partner ${i + 1}`} (${p.percentage}%)`,
+      value: p.estimatedShare,
+      color: `hsl(var(--chart-${(i % 5) + 1}))`,
+    })).filter((item: { name: string; value: number; color: string }) => item.value > 0)
     : [];
 
   return (
@@ -170,10 +170,10 @@ export function RevenueTab({ eventId }: RevenueTabProps) {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => `$${Number(value).toFixed(2)}`}
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "var(--radius)",
                     }}

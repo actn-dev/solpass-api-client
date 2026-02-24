@@ -216,32 +216,35 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">
-                        {status.parties.map((p) => (
-                            <div key={p.walletAddress} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                                    <div>
-                                        <span className="font-medium">{p.partyName}</span>
-                                        <div className="flex items-center gap-1 mt-0.5">
-                                            <span className="text-muted-foreground font-mono text-xs">{p.walletAddress.slice(0, 8)}…{p.walletAddress.slice(-6)}</span>
-                                            <a
-                                                href={solscanUrl(p.walletAddress)}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-blue-500 hover:text-blue-600 transition-colors"
-                                                title="View on Solscan"
-                                            >
-                                                <ExternalLink className="h-3 w-3" />
-                                            </a>
+                        {(() => {
+                            const totalPct = status.parties.reduce((s, p) => s + p.percentage, 0) || 100;
+                            return status.parties.map((p) => (
+                                <div key={p.walletAddress} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                                        <div>
+                                            <span className="font-medium">{p.partyName}</span>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <span className="text-muted-foreground font-mono text-xs">{p.walletAddress.slice(0, 8)}…{p.walletAddress.slice(-6)}</span>
+                                                <a
+                                                    href={solscanUrl(p.walletAddress)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-blue-500 hover:text-blue-600 transition-colors"
+                                                    title="View on Solscan"
+                                                >
+                                                    <ExternalLink className="h-3 w-3" />
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
+                                    <span className="font-semibold text-green-600">
+                                        ${((status.escrowBalance * p.percentage) / totalPct).toFixed(4)}
+                                        <span className="text-muted-foreground font-normal ml-1">({p.percentage}%)</span>
+                                    </span>
                                 </div>
-                                <span className="font-semibold text-green-600">
-                                    ${((status.escrowBalance * p.percentage) / 100).toFixed(4)}
-                                    <span className="text-muted-foreground font-normal ml-1">({p.percentage}%)</span>
-                                </span>
-                            </div>
-                        ))}
+                            ));
+                        })()}
                     </div>
                     <div className="mt-4 text-xs text-muted-foreground text-right">
                         Total distributed: <span className="font-semibold">${status.escrowBalance.toFixed(4)}</span>
@@ -316,7 +319,8 @@ export function RoyaltiesTab({ eventId }: RoyaltiesTabProps) {
                             const hasKey = !!keyMap[party.walletAddress];
                             const isApproved = party.approved;
                             const isLoading = loadingWallet === party.walletAddress;
-                            const estimatedAmount = (status.escrowBalance * party.percentage) / 100;
+                            const totalPct = status.parties.reduce((s, p) => s + p.percentage, 0) || 100;
+                            const estimatedAmount = (status.escrowBalance * party.percentage) / totalPct;
 
                             return (
                                 <div
