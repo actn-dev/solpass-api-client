@@ -35,7 +35,7 @@ export default function TicketmasterEventsPage() {
     const { data: solpassData } = useQuery({
         queryKey: ["solpass-events-tm"],
         queryFn: async () => {
-            const res = await apiClient.GET("/api/v1/events", { params: { query: { limit: 100, partnerId: "c61129bf-a6d4-47aa-80b8-67e9cb672adf" } } });
+            const res = await apiClient.GET("/api/v1/events", { params: { query: { limit: 100, } } });
             return (res.data as any)?.data ?? [];
         },
     });
