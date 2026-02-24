@@ -1,19 +1,22 @@
 "use client";
 
 import { useAuth } from "@/lib/hooks/use-auth";
+import { usePlatform } from "@/lib/hooks/use-platform";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Key, Copy, RefreshCw, Download, Shield } from "lucide-react";
+import { Key, Copy, RefreshCw, Download, Shield, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ApiKeysPage() {
   const { getApiKey, regenerateApiKey } = useAuth();
+  const { setApiKey: setPlatformApiKey, isConfigured } = usePlatform();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
   const handleGetApiKey = async () => {
@@ -21,6 +24,7 @@ export default function ApiKeysPage() {
     try {
       const key = await getApiKey();
       setApiKey(key);
+      setPlatformApiKey(key);
       setShowKey(true);
     } catch (error) {
       // Error handled in hook
@@ -33,16 +37,31 @@ export default function ApiKeysPage() {
     if (!confirm("Are you sure? This will invalidate your current API key.")) {
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const key = await regenerateApiKey();
       setApiKey(key);
+      setPlatformApiKey(key);
       setShowKey(true);
     } catch (error) {
       // Error handled in hook
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSyncApiKey = async () => {
+    setIsSyncing(true);
+    try {
+      const key = await getApiKey();
+      setPlatformApiKey(key);
+      setApiKey(key);
+      toast.success("API key synced successfully!");
+    } catch {
+      toast.error("Failed to sync API key. Please try again.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -55,7 +74,7 @@ export default function ApiKeysPage() {
 
   const handleDownload = () => {
     if (!apiKey) return;
-    
+
     const content = `# Solpass API Configuration
 # DO NOT commit this file to version control!
 
@@ -171,6 +190,28 @@ SOLPASS_API_URL=http://localhost:3000
             <RefreshCw className="h-4 w-4" />
             Regenerate Key
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Sync API Key */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sync API Key to Platform</CardTitle>
+          <CardDescription>
+            Fetches your current API key and saves it locally so the Ticketmaster integration and other simulations can use it.
+            Use this if you see &quot;API key not configured&quot; errors.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center gap-4">
+          <Button onClick={handleSyncApiKey} disabled={isSyncing} className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            {isSyncing ? "Syncing..." : "Sync API Key"}
+          </Button>
+          {isConfigured && (
+            <span className="text-sm text-green-600 flex items-center gap-1">
+              <CheckCircle className="h-4 w-4" /> Configured
+            </span>
+          )}
         </CardContent>
       </Card>
 

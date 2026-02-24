@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { useMode } from "@/lib/hooks/use-mode";
 import { usePlatform } from "@/lib/hooks/use-platform";
 import { useTmTickets, type TmPurchasedTicket } from "@/lib/hooks/use-tm-tickets";
@@ -40,7 +41,17 @@ function TMEventDetail() {
 
     const { mode, getUserId, getWalletAddress } = useMode();
     const userId = getUserId();
-    const { isConfigured } = usePlatform();
+    const { isConfigured, setApiKey } = usePlatform();
+    const { getApiKey, isAuthenticated } = useAuth();
+
+    // ── Auto-configure API key on mount ──────────────────────────────────────
+    const [configError, setConfigError] = useState(false);
+    useEffect(() => {
+        if (isConfigured || !isAuthenticated) return;
+        getApiKey()
+            .then((key) => { setApiKey(key); setConfigError(false); })
+            .catch(() => setConfigError(true));
+    }, [isAuthenticated, isConfigured]);
 
     // ── Buy error banner ─────────────────────────────────────────────────────
     const [buyError, setBuyError] = useState<string | null>(null);
@@ -255,6 +266,27 @@ function TMEventDetail() {
                             <AlertDescription className="flex items-center justify-between gap-2">
                                 <span>{buyError}</span>
                                 <button onClick={() => setBuyError(null)} className="text-xs underline shrink-0">Dismiss</button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* API key config error banner */}
+                    {configError && (
+                        <Alert variant="destructive">
+                            <AlertDescription className="flex items-center justify-between gap-2">
+                                <span>Could not auto-configure API key.</span>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="shrink-0"
+                                    onClick={() =>
+                                        getApiKey()
+                                            .then((key) => { setApiKey(key); setConfigError(false); })
+                                            .catch(() => setConfigError(true))
+                                    }
+                                >
+                                    Retry
+                                </Button>
                             </AlertDescription>
                         </Alert>
                     )}
