@@ -96,6 +96,9 @@ export default function EventDetailsPage() {
           <Link href="/dashboard/events">
             <Button variant="outline">← Back</Button>
           </Link>
+          <Link href={`/integrations/ticketmaster/${eventData.eventId}?tmId=${eventData.eventId}`}>
+            <Button variant="outline">🎟 TM Simulation</Button>
+          </Link>
           <Link href={`/events/${eventData.eventId}`}>
             <Button>View on Platform →</Button>
           </Link>

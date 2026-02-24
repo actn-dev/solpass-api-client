@@ -8,7 +8,7 @@ import { apiClient } from "@/lib/api-client";
 import { useMode } from "@/lib/hooks/use-mode";
 import { usePlatform } from "@/lib/hooks/use-platform";
 import { useTmTickets, type TmPurchasedTicket } from "@/lib/hooks/use-tm-tickets";
-import { UserSwitcher } from "@/components/platform/user-switcher";
+import { UserAvatarSwitcher } from "@/components/platform/user-avatar-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -52,6 +52,10 @@ function TMEventDetail() {
 
     // ── Filter state ─────────────────────────────────────────────────────────
     const [offerFilter, setOfferFilter] = useState<TicketType | "ALL">("ALL");
+
+    // ── Per-card pending state ────────────────────────────────────────────────
+    const [pendingOfferId, setPendingOfferId] = useState<string | null>(null);
+    const [pendingResaleId, setPendingResaleId] = useState<string | null>(null);
 
     // ── Remote data ──────────────────────────────────────────────────────────
     const { data: tmEvent, isLoading: tmLoading } = useQuery({
@@ -179,13 +183,15 @@ function TMEventDetail() {
     const handleBuyPrimary = (offer: TicketOffer) => {
         if (mode === "admin") return;
         setBuyError(null);
-        primaryMutation.mutate(offer);
+        setPendingOfferId(offer.offerId);
+        primaryMutation.mutate(offer, { onSettled: () => setPendingOfferId(null) });
     };
 
     const handleBuyResale = (ticket: TmPurchasedTicket) => {
         if (mode === "admin") return;
         setBuyError(null);
-        resaleMutation.mutate(ticket);
+        setPendingResaleId(ticket.ticketId);
+        resaleMutation.mutate(ticket, { onSettled: () => setPendingResaleId(null) });
     };
 
     const openResaleDialog = (ticket: TmPurchasedTicket) => {
@@ -217,12 +223,21 @@ function TMEventDetail() {
             <div className="bg-[#026CDF] text-white py-3 px-6 flex items-center gap-3 text-sm">
                 <span className="font-bold text-base">Ticketmaster</span>
                 <span className="opacity-60">×</span>
-                <span className="font-semibold">Solpass Royalty Layer</span>
-                <Link href="/integrations/ticketmaster" className="ml-auto">
-                    <Button size="sm" variant="ghost" className="text-white hover:text-white hover:bg-white/20">
-                        ← Back to Events
-                    </Button>
-                </Link>
+                <span className="font-semibold">Solpass Layer</span>
+                <div className="ml-auto flex items-center gap-2">
+                    {spEvent?.eventId && (
+                        <Link href={`/dashboard/events/${spEvent.eventId}`}>
+                            <Button size="sm" variant="ghost" className="text-white hover:text-white hover:bg-white/20">
+                                Admin Dashboard ↗
+                            </Button>
+                        </Link>
+                    )}
+                    <Link href="/integrations/ticketmaster">
+                        <Button size="sm" variant="ghost" className="text-white hover:text-white hover:bg-white/20">
+                            ← Back to Events
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {isLoading && (
@@ -233,11 +248,6 @@ function TMEventDetail() {
 
             {!isLoading && (
                 <div className="container mx-auto py-8 px-4 max-w-5xl space-y-6">
-
-                    {/* User switcher */}
-                    <div className="max-w-xs">
-                        <UserSwitcher />
-                    </div>
 
                     {/* Buy error banner */}
                     {buyError && (
@@ -372,7 +382,7 @@ function TMEventDetail() {
                                         key={ticket.ticketId}
                                         ticket={ticket}
                                         isAdmin={mode === "admin"}
-                                        isPending={resaleMutation.isPending}
+                                        isPending={pendingResaleId === ticket.ticketId}
                                         onBuy={() => handleBuyResale(ticket)}
                                     />
                                 ))}
@@ -423,7 +433,7 @@ function TMEventDetail() {
                                             offer={offer}
                                             currency={currency}
                                             isAdmin={mode === "admin"}
-                                            isPending={primaryMutation.isPending}
+                                            isPending={pendingOfferId === offer.offerId}
                                             onBuy={() => handleBuyPrimary(offer)}
                                         />
                                     ))}
@@ -432,6 +442,11 @@ function TMEventDetail() {
                     </div>
                 </div>
             )}
+
+            {/* ── FLOATING USER SWITCHER ────────────────────────────────────── */}
+            <div className="fixed bottom-4 right-4 z-50">
+                <UserAvatarSwitcher />
+            </div>
 
             {/* ── RESALE DIALOG ──────────────────────────────────────────────── */}
             <Dialog open={resaleDialogOpen} onOpenChange={setResaleDialogOpen}>

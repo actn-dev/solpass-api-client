@@ -107,7 +107,7 @@ export function EnableRoyaltiesDialog({ tmEvent, open, onOpenChange, onSuccess }
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Enable Solpass Royalties</DialogTitle>
+                    <DialogTitle>Enable Solpass</DialogTitle>
                     <DialogDescription>
                         Registering <strong>{tmEvent.name}</strong> on Solpass. Configure partners and multi-sig approval threshold.
                     </DialogDescription>

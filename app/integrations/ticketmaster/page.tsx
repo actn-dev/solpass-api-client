@@ -71,7 +71,7 @@ export default function TicketmasterEventsPage() {
             <div className="bg-[#026CDF] text-white py-3 px-6 flex items-center gap-3 text-sm">
                 <span className="font-bold text-base">Ticketmaster</span>
                 <span className="opacity-60">×</span>
-                <span className="font-semibold">Solpass Royalty Layer</span>
+                <span className="font-semibold">Solpass Layer</span>
                 <Badge className="ml-auto bg-white text-[#026CDF] hover:bg-white">Integration Demo</Badge>
             </div>
 
@@ -179,7 +179,7 @@ export default function TicketmasterEventsPage() {
                                                 </div>
                                             ) : (
                                                 <Button size="sm" className="w-full" onClick={() => setDialogEvent(event)}>
-                                                    Enable Solpass Royalties
+                                                    Enable Solpass
                                                 </Button>
                                             )}
                                         </CardContent>
