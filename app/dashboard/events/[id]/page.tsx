@@ -12,6 +12,7 @@ import {
   BarChart3,
   DollarSign,
   Ticket,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ import { OverviewTab } from "@/components/dashboard/analytics/overview-tab";
 import { AnalyticsTab } from "@/components/dashboard/analytics/analytics-tab";
 import { RevenueTab } from "@/components/dashboard/analytics/revenue-tab";
 import { TicketsTab } from "@/components/dashboard/analytics/tickets-tab";
+import { RoyaltiesTab } from "@/components/dashboard/analytics/royalties-tab";
 
 export default function EventDetailsPage() {
   const { id } = useParams();
@@ -119,6 +121,12 @@ export default function EventDetailsPage() {
             <Ticket className="h-4 w-4" />
             Tickets
           </TabsTrigger>
+          {eventData.blockchainEnabled && (
+            <TabsTrigger value="royalties" className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Royalties
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -136,6 +144,12 @@ export default function EventDetailsPage() {
         <TabsContent value="tickets" className="space-y-4">
           <TicketsTab eventId={eventData.eventId} eventData={eventData} />
         </TabsContent>
+
+        {eventData.blockchainEnabled && (
+          <TabsContent value="royalties" className="space-y-4">
+            <RoyaltiesTab eventId={eventData.eventId} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
