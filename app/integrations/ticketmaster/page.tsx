@@ -26,8 +26,8 @@ interface TMEvent {
 }
 
 export default function TicketmasterEventsPage() {
-    const [keyword, setKeyword] = useState("concert");
-    const [search, setSearch] = useState("concert");
+    const [keyword, setKeyword] = useState("sport");
+    const [search, setSearch] = useState("sport");
     const [enabled, setEnabled] = useState<Record<string, string>>({});
     const [dialogEvent, setDialogEvent] = useState<TMEvent | null>(null);
 
