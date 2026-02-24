@@ -73,7 +73,7 @@ export default function DashboardPage() {
           description="Events created"
           iconColor="text-blue-600"
         />
-        <StatsCard
+        {/* <StatsCard
           title="Tickets Sold"
           value={totalTicketsSold}
           icon={Ticket}
@@ -86,29 +86,29 @@ export default function DashboardPage() {
           icon={DollarSign}
           description="USDC earned"
           iconColor="text-yellow-600"
-        />
-        <StatsCard
+        /> */}
+        {/* <StatsCard
           title="Active Events"
           value={activeEvents}
           icon={TrendingUp}
           description="Upcoming events"
           iconColor="text-purple-600"
-        />
+        /> */}
       </div>
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-4">
-        <Link href="/events">
+        {/* <Link href="/events">
           <Button size="lg" className="gap-2">
             <Plus className="h-5 w-5" />
             Create Event on Platform
           </Button>
-        </Link>
-        <Link href="/dashboard/events">
+        </Link> */}
+        {/* <Link href="/dashboard/events">
           <Button size="lg" variant="outline">
             View All Events
           </Button>
-        </Link>
+        </Link> */}
         <Link href="/integrations/ticketmaster">
           <Button size="lg" variant="outline" className="gap-2 border-[#026CDF] text-[#026CDF] hover:bg-[#026CDF] hover:text-white">
             🎟️ Ticketmaster Integration
