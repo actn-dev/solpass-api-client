@@ -22,9 +22,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { tmEvent, totalTickets, ticketPrice, partners } = await req.json();
+    const { tmEvent, totalTickets, ticketPrice, partners, distributionThreshold } = await req.json();
 
     const shortId = tmEvent.id.slice(0, 16);
+
+    const resolvedPartners = partners ?? [
+      { partyName: "Artist", percentage: 8,  walletAddress: "" },
+      { partyName: "Venue",  percentage: 5,  walletAddress: "" },
+      { partyName: "TM",     percentage: 2,  walletAddress: "CD8bTqYcRvEvG1y73S5yZMP4PmXkqiMaP9NYvx6vxGbo" },
+    ];
 
     // Map TM event → Solpass CreateEventDto
     const createBody = {
@@ -35,10 +41,8 @@ export async function POST(req: NextRequest) {
       eventDate: tmEvent.date ? new Date(tmEvent.date).toISOString() : new Date().toISOString(),
       totalTickets: totalTickets ?? 100,
       ticketPrice: ticketPrice ?? tmEvent.minPrice ?? 100,
-      royaltyDistribution: partners ?? [
-        { partyName: "Artist", percentage: 60, walletAddress: "" },
-        { partyName: "Venue",  percentage: 40, walletAddress: "" },
-      ],
+      royaltyDistribution: resolvedPartners,
+      distributionThreshold: distributionThreshold ?? Math.ceil(resolvedPartners.length / 2),
     };
 
     // Step 1: Create event — fall back to existing if already created
